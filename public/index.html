@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bou — AI Assistant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Background orbs -->
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+  <div class="bg-orb orb-3"></div>
+
+  <!-- Navigation -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-inner">
+      <a href="#chat" class="nav-logo" onclick="showSection('chat')">
+        <span class="logo-dot"></span>Bou
+      </a>
+      <div class="nav-links" id="navLinks">
+        <a href="#" class="nav-link active" onclick="showSection('chat'); setActive(this)">Chat</a>
+        <a href="#" class="nav-link" onclick="showSection('about'); setActive(this)">About</a>
+      </div>
+      <button class="hamburger" id="hamburger" onclick="toggleMenu()" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Mobile menu overlay -->
+  <div class="mobile-menu" id="mobileMenu">
+    <a href="#" class="mobile-link" onclick="showSection('chat'); closeMobileMenu(); setActive(document.querySelectorAll('.nav-link')[0])">Chat</a>
+    <a href="#" class="mobile-link" onclick="showSection('about'); closeMobileMenu(); setActive(document.querySelectorAll('.nav-link')[1])">About</a>
+  </div>
+
+  <!-- CHAT SECTION -->
+  <section class="section active" id="section-chat">
+    <div class="chat-wrapper">
+      <div class="chat-header">
+        <div class="bou-avatar">
+          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="20" cy="20" r="20" fill="url(#grad)"/>
+            <circle cx="15" cy="18" r="3" fill="white" opacity="0.9"/>
+            <circle cx="25" cy="18" r="3" fill="white" opacity="0.9"/>
+            <path d="M14 26 Q20 30 26 26" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.8"/>
+            <defs>
+              <linearGradient id="grad" x1="0" y1="0" x2="40" y2="40">
+                <stop offset="0%" stop-color="#3b82f6"/>
+                <stop offset="100%" stop-color="#1e3a8a"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <div class="chat-header-text">
+          <h2>Bou</h2>
+          <span class="status-dot"></span><span class="status-text">Online</span>
+        </div>
+      </div>
+
+      <div class="messages-container" id="messages">
+        <div class="message bou-message intro-message">
+          <div class="message-bubble">
+            Hello! I'm <strong>Bou</strong>, your AI assistant. Ask me anything — I'm here to help. 👋
+          </div>
+          <span class="message-time">Just now</span>
+        </div>
+      </div>
+
+      <div class="chat-input-area">
+        <div class="input-row">
+          <textarea
+            id="userInput"
+            placeholder="Ask Bou something..."
+            rows="1"
+            onkeydown="handleKey(event)"
+            oninput="autoResize(this)"
+          ></textarea>
+          <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M22 2L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+        <p class="disclaimer">Powered by AI (via API integration)</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ABOUT SECTION -->
+  <section class="section" id="section-about">
+    <div class="about-wrapper">
+      <div class="about-hero">
+        <div class="about-avatar">
+          <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="40" cy="40" r="40" fill="url(#grad2)"/>
+            <circle cx="30" cy="36" r="6" fill="white" opacity="0.9"/>
+            <circle cx="50" cy="36" r="6" fill="white" opacity="0.9"/>
+            <path d="M28 52 Q40 60 52 52" stroke="white" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.8"/>
+            <defs>
+              <linearGradient id="grad2" x1="0" y1="0" x2="80" y2="80">
+                <stop offset="0%" stop-color="#3b82f6"/>
+                <stop offset="100%" stop-color="#1e3a8a"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <h1 class="about-title">Meet <span>Bou</span></h1>
+        <p class="about-subtitle">A professional AI assistant built for clarity and helpfulness.</p>
+      </div>
+
+      <div class="about-cards">
+        <div class="about-card">
+          <div class="card-icon">🤖</div>
+          <h3>What is Bou?</h3>
+          <p>Bou is an AI-powered chat assistant designed to answer questions, explain concepts, and help with everyday tasks in a clear and professional manner.</p>
+        </div>
+        <div class="about-card">
+          <div class="card-icon">⚡</div>
+          <h3>How it works</h3>
+          <p>This app integrates external AI models to generate responses. Your messages are securely sent to our backend, which queries the AI API and returns a response — your API key is never exposed.</p>
+        </div>
+        <div class="about-card">
+          <div class="card-icon">🔒</div>
+          <h3>Privacy & Safety</h3>
+          <p>Bou does not store your conversations. Each session is independent. We do not collect or share personal data from your chats.</p>
+        </div>
+      </div>
+
+      <div class="about-disclosure">
+        <div class="disclosure-badge">
+          <span>⚙️</span>
+          <div>
+            <strong>Powered by AI (via API integration)</strong>
+            <p>This app integrates external AI models to generate responses. Bou is not a proprietary AI — it is an interface built on top of third-party AI APIs.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="about-cta">
+        <button onclick="showSection('chat'); setActive(document.querySelectorAll('.nav-link')[0])">
+          Start Chatting with Bou →
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>
