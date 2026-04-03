@@ -1,4 +1,4 @@
-// No require needed — native fetch is built into Node.js 18+
+// No require needed — native fetch is built into Node.js 24
 
 const SYSTEM_PROMPT = `You are Bou, a professional and informative AI assistant. 
 You help users with general knowledge, questions, explanations, and everyday tasks. 
@@ -40,7 +40,7 @@ module.exports = async (req, res) => {
 
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
