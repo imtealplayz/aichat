@@ -6,7 +6,6 @@ Keep responses clear, concise, and helpful. Avoid overly long answers unless the
 You are friendly but professional in tone. If you don't know something, say so honestly.`;
 
 module.exports = async (req, res) => {
-  // Only allow POST
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -22,7 +21,6 @@ module.exports = async (req, res) => {
     return res.status(500).json({ error: "API key not configured." });
   }
 
-  // Build conversation contents
   const contents = [];
 
   if (Array.isArray(history)) {
@@ -42,7 +40,7 @@ module.exports = async (req, res) => {
 
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
