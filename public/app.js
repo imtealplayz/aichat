@@ -143,7 +143,7 @@ async function sendMessage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         message: text,
-        history: conversationHistory.slice(0, -1) // send prior turns only
+        history: conversationHistory.slice(0, -1)
       })
     });
 
@@ -161,7 +161,7 @@ async function sendMessage() {
     }
   } catch (err) {
     hideTyping();
-    addMessage("⚠️ Could not reach the server. Make sure the backend is running on port 3000.", "bou");
+    addMessage("⚠️ Could not reach the server. Please try again.", "bou");
   }
 
   // Unlock UI
