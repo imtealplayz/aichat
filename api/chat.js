@@ -23,7 +23,6 @@ module.exports = async (req, res) => {
     return res.status(500).json({ error: "API key not configured." });
   }
 
-  // Build messages array
   const messages = [{ role: "system", content: SYSTEM_PROMPT }];
 
   if (Array.isArray(history)) {
