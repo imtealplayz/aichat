@@ -31,8 +31,18 @@ function showPage(name) {
   if (page) page.classList.add("active");
   // Update topbar title
   const titles = { chat: "Bou", about: "About", info: "Info" };
-  const el = document.getElementById("topbarTitle");
-  if (el) el.textContent = titles[name] || "Bou";
+  const titleEl = document.getElementById("topbarTitle");
+  if (titleEl) titleEl.textContent = titles[name] || "Bou";
+  // Update active nav items by data-page attribute
+  document.querySelectorAll(".nav-item[data-page]").forEach(n => {
+    n.classList.toggle("active", n.dataset.page === name);
+  });
+}
+
+// Single entry point for navigation — used by all nav links
+function navigate(name) {
+  showPage(name);
+  closeMobileMenu();
 }
 
 function setActive(el) {
