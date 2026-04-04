@@ -3,26 +3,23 @@ const conversationHistory = [];
 let isLoading = false;
 
 // ===== DOM REFS =====
-const messagesEl  = document.getElementById("messages");
-const inputEl     = document.getElementById("userInput");
-const sendBtn     = document.getElementById("sendBtn");
-const welcomeEl   = document.getElementById("welcomeState");
+const messagesEl = document.getElementById("messages");
+const inputEl    = document.getElementById("userInput");
+const sendBtn    = document.getElementById("sendBtn");
+const welcomeEl  = document.getElementById("welcomeState");
 
 // ===== SECTION NAV =====
 function showSection(name) {
   document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
   document.getElementById("section-" + name).classList.add("active");
 }
-
 function setActive(el) {
   document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
   el.classList.add("active");
 }
-
 function setActiveByName(name) {
   document.querySelectorAll(".nav-item").forEach(n => {
-    if (n.textContent.trim().toLowerCase() === name) n.classList.add("active");
-    else n.classList.remove("active");
+    n.classList.toggle("active", n.textContent.trim().toLowerCase() === name);
   });
 }
 
@@ -31,17 +28,12 @@ function toggleMobileMenu() {
   const drawer  = document.getElementById("mobileDrawer");
   const overlay = document.getElementById("mobileOverlay");
   const btn     = document.getElementById("hamburger");
-  const isOpen  = drawer.classList.contains("open");
-
-  if (isOpen) { closeMobileMenu(); }
-  else {
-    drawer.classList.add("open");
-    overlay.style.display = "block";
-    setTimeout(() => overlay.classList.add("open"), 10);
-    btn.classList.add("open");
-  }
+  if (drawer.classList.contains("open")) { closeMobileMenu(); return; }
+  drawer.classList.add("open");
+  overlay.style.display = "block";
+  setTimeout(() => overlay.classList.add("open"), 10);
+  btn.classList.add("open");
 }
-
 function closeMobileMenu() {
   const drawer  = document.getElementById("mobileDrawer");
   const overlay = document.getElementById("mobileOverlay");
@@ -52,7 +44,7 @@ function closeMobileMenu() {
   setTimeout(() => { overlay.style.display = "none"; }, 280);
 }
 
-// ===== SUGGESTION CHIPS =====
+// ===== SUGGESTIONS =====
 function fillSuggestion(el) {
   inputEl.value = el.textContent;
   autoResize(inputEl);
@@ -60,28 +52,35 @@ function fillSuggestion(el) {
   inputEl.focus();
 }
 
-// ===== TIME =====
+// ===== UTILS =====
 function getTime() {
   return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
-
-// ===== SEND BUTTON STATE =====
 function updateSendBtn() {
   sendBtn.disabled = inputEl.value.trim() === "" || isLoading;
 }
-
-// ===== AUTO RESIZE TEXTAREA =====
 function autoResize(el) {
   el.style.height = "auto";
   el.style.height = Math.min(el.scrollHeight, 160) + "px";
   updateSendBtn();
 }
-
-// ===== ENTER KEY =====
 function handleKey(e) {
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
     if (!sendBtn.disabled) sendMessage();
+  }
+}
+function scrollToBottom() {
+  messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: "smooth" });
+}
+
+// ===== DISMISS WELCOME =====
+function dismissWelcome() {
+  if (welcomeEl && welcomeEl.parentNode) {
+    welcomeEl.style.opacity = "0";
+    welcomeEl.style.transform = "translateY(-8px)";
+    welcomeEl.style.transition = "opacity 0.2s, transform 0.2s";
+    setTimeout(() => welcomeEl.remove(), 200);
   }
 }
 
@@ -90,50 +89,31 @@ function renderMarkdown(text) {
   function escHtml(s) {
     return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   }
-
-  // Extract code blocks
   const codeBlocks = [];
   text = text.replace(/```(\w+)?\n?([\s\S]*?)```/g, (_, lang, code) => {
     const idx = codeBlocks.length;
     codeBlocks.push({ lang: lang || "code", code: escHtml(code.trim()) });
     return `%%CB_${idx}%%`;
   });
-
   text = escHtml(text);
-
-  // Inline code
   text = text.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
-
-  // Bold + italic
   text = text.replace(/\*\*\*(.*?)\*\*\*/g, "<strong><em>$1</em></strong>");
   text = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-
-  // Headings
   text = text.replace(/^### (.+)$/gm, '<h3 class="md-h3">$1</h3>');
   text = text.replace(/^## (.+)$/gm,  '<h2 class="md-h2">$1</h2>');
   text = text.replace(/^# (.+)$/gm,   '<h1 class="md-h1">$1</h1>');
-
-  // HR
   text = text.replace(/^---$/gm, '<hr class="md-hr">');
-
-  // Numbered list
   text = text.replace(/((?:^\d+\. .+\n?)+)/gm, match => {
     const items = match.trim().split("\n").map(l => `<li>${l.replace(/^\d+\. /,"")}</li>`).join("");
     return `<ol class="md-ol">${items}</ol>`;
   });
-
-  // Bullet list
   text = text.replace(/((?:^[*\-] .+\n?)+)/gm, match => {
     const items = match.trim().split("\n").map(l => `<li>${l.replace(/^[*\-] /,"")}</li>`).join("");
     return `<ul class="md-ul">${items}</ul>`;
   });
-
-  // Paragraphs
   text = text.replace(/\n{2,}/g, "</p><p class='md-p'>");
   text = `<p class="md-p">${text}</p>`;
   text = text.replace(/(?<!>)\n(?!<)/g, "<br>");
-
-  // Restore code blocks
   text = text.replace(/%%CB_(\d+)%%/g, (_, i) => {
     const { lang, code } = codeBlocks[i];
     return `<div class="code-block">
@@ -148,7 +128,6 @@ function renderMarkdown(text) {
       <pre class="code-pre"><code>${code}</code></pre>
     </div>`;
   });
-
   return text;
 }
 
@@ -165,56 +144,44 @@ function copyCode(btn) {
   });
 }
 
-// ===== ADD MESSAGE =====
-function addMessage(content, role) {
-  // Hide welcome state on first message
-  if (welcomeEl && welcomeEl.parentNode) {
-    welcomeEl.style.opacity = "0";
-    welcomeEl.style.transform = "translateY(-8px)";
-    welcomeEl.style.transition = "opacity 0.2s, transform 0.2s";
-    setTimeout(() => welcomeEl.remove(), 200);
-  }
-
+// ===== ADD USER MESSAGE =====
+function addUserMessage(content) {
+  dismissWelcome();
   const row = document.createElement("div");
-  row.className = `message-row ${role === "user" ? "user-row" : "bou-row"}`;
+  row.className = "message-row user-row";
 
   const avatar = document.createElement("div");
-  avatar.className = `msg-avatar ${role === "user" ? "user-avatar-sm" : "bou-avatar-sm"}`;
-  avatar.textContent = role === "user" ? "You" : "B";
+  avatar.className = "user-avatar-sm";
+  avatar.textContent = "You";
 
-  const content_wrap = document.createElement("div");
-  content_wrap.className = "msg-content";
+  const wrap = document.createElement("div");
+  wrap.className = "msg-content";
 
   const bubble = document.createElement("div");
-  bubble.className = `bubble ${role === "user" ? "user-bubble" : "bou-bubble"}`;
-
-  if (role === "user") {
-    bubble.textContent = content;
-  } else {
-    bubble.innerHTML = renderMarkdown(content);
-  }
+  bubble.className = "bubble user-bubble";
+  bubble.textContent = content;
 
   const time = document.createElement("span");
   time.className = "msg-time";
   time.textContent = getTime();
 
-  content_wrap.appendChild(bubble);
-  content_wrap.appendChild(time);
+  wrap.appendChild(bubble);
+  wrap.appendChild(time);
   row.appendChild(avatar);
-  row.appendChild(content_wrap);
+  row.appendChild(wrap);
   messagesEl.appendChild(row);
   scrollToBottom();
 }
 
-// ===== TYPING INDICATOR =====
-function showTyping() {
+// ===== THINKING INDICATOR =====
+function showThinking() {
   const row = document.createElement("div");
   row.className = "message-row bou-row typing-row";
-  row.id = "typingRow";
+  row.id = "thinkingRow";
 
   const avatar = document.createElement("div");
-  avatar.className = "msg-avatar bou-avatar-sm";
-  avatar.textContent = "B";
+  avatar.className = "msg-avatar";
+  avatar.innerHTML = `<img src="/images/bou-avatar.png" alt="Bou" />`;
 
   const wrap = document.createElement("div");
   wrap.className = "msg-content";
@@ -225,7 +192,7 @@ function showTyping() {
 
   const label = document.createElement("span");
   label.className = "typing-label";
-  label.textContent = "Bou is typing...";
+  label.textContent = "Bou is thinking...";
 
   wrap.appendChild(dots);
   wrap.appendChild(label);
@@ -235,14 +202,63 @@ function showTyping() {
   scrollToBottom();
 }
 
-function hideTyping() {
-  const el = document.getElementById("typingRow");
+function hideThinking() {
+  const el = document.getElementById("thinkingRow");
   if (el) el.remove();
 }
 
-// ===== SCROLL =====
-function scrollToBottom() {
-  messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: "smooth" });
+// ===== STREAM RESPONSE WORD BY WORD =====
+async function streamResponse(fullText) {
+  const row = document.createElement("div");
+  row.className = "message-row bou-row";
+
+  const avatar = document.createElement("div");
+  avatar.className = "msg-avatar";
+  avatar.innerHTML = `<img src="/images/bou-avatar.png" alt="Bou" />`;
+
+  const wrap = document.createElement("div");
+  wrap.className = "msg-content";
+
+  const bubble = document.createElement("div");
+  bubble.className = "bubble bou-bubble";
+
+  // Start with just a cursor
+  bubble.innerHTML = `<span class="stream-cursor"></span>`;
+
+  const time = document.createElement("span");
+  time.className = "msg-time";
+  time.textContent = getTime();
+
+  wrap.appendChild(bubble);
+  wrap.appendChild(time);
+  row.appendChild(avatar);
+  row.appendChild(wrap);
+  messagesEl.appendChild(row);
+  scrollToBottom();
+
+  // Split into words and stream them
+  const words = fullText.split(" ");
+  let streamed = "";
+  const delay = ms => new Promise(r => setTimeout(r, ms));
+
+  for (let i = 0; i < words.length; i++) {
+    streamed += (i === 0 ? "" : " ") + words[i];
+    // Show plain text while streaming, cursor at end
+    bubble.innerHTML = escapeHtmlSimple(streamed) + `<span class="stream-cursor"></span>`;
+    scrollToBottom();
+    // Speed: short words faster, longer words slightly slower
+    const wordLen = words[i].length;
+    const ms = wordLen > 8 ? 38 : wordLen > 4 ? 28 : 18;
+    await delay(ms);
+  }
+
+  // Done streaming — render full markdown, remove cursor
+  bubble.innerHTML = renderMarkdown(fullText);
+  scrollToBottom();
+}
+
+function escapeHtmlSimple(s) {
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 }
 
 // ===== SEND MESSAGE =====
@@ -254,12 +270,15 @@ async function sendMessage() {
   inputEl.style.height = "auto";
   updateSendBtn();
 
-  addMessage(text, "user");
+  addUserMessage(text);
   conversationHistory.push({ role: "user", content: text });
 
   isLoading = true;
   sendBtn.disabled = true;
-  showTyping();
+
+  // Show "Bou is thinking..." for ~800ms before responding
+  showThinking();
+  await new Promise(r => setTimeout(r, 800));
 
   try {
     const response = await fetch("/api/chat", {
@@ -272,18 +291,55 @@ async function sendMessage() {
     });
 
     const data = await response.json();
-    hideTyping();
+    hideThinking();
 
     if (!response.ok || data.error) {
-      addMessage("⚠️ " + (data.error || "Something went wrong. Please try again."), "bou");
+      // Show error as plain bou message
+      const row = document.createElement("div");
+      row.className = "message-row bou-row";
+      const avatar = document.createElement("div");
+      avatar.className = "msg-avatar";
+      avatar.innerHTML = `<img src="/images/bou-avatar.png" alt="Bou" />`;
+      const wrap = document.createElement("div");
+      wrap.className = "msg-content";
+      const bubble = document.createElement("div");
+      bubble.className = "bubble bou-bubble";
+      bubble.textContent = "⚠️ " + (data.error || "Something went wrong. Please try again.");
+      const time = document.createElement("span");
+      time.className = "msg-time";
+      time.textContent = getTime();
+      wrap.appendChild(bubble);
+      wrap.appendChild(time);
+      row.appendChild(avatar);
+      row.appendChild(wrap);
+      messagesEl.appendChild(row);
+      scrollToBottom();
     } else {
-      addMessage(data.reply, "bou");
+      await streamResponse(data.reply);
       conversationHistory.push({ role: "assistant", content: data.reply });
       if (conversationHistory.length > 20) conversationHistory.splice(0, 2);
     }
   } catch (err) {
-    hideTyping();
-    addMessage("⚠️ Could not reach the server. Please try again.", "bou");
+    hideThinking();
+    const row = document.createElement("div");
+    row.className = "message-row bou-row";
+    const avatar = document.createElement("div");
+    avatar.className = "msg-avatar";
+    avatar.innerHTML = `<img src="/images/bou-avatar.png" alt="Bou" />`;
+    const wrap = document.createElement("div");
+    wrap.className = "msg-content";
+    const bubble = document.createElement("div");
+    bubble.className = "bubble bou-bubble";
+    bubble.textContent = "⚠️ Could not reach the server. Please try again.";
+    const time = document.createElement("span");
+    time.className = "msg-time";
+    time.textContent = getTime();
+    wrap.appendChild(bubble);
+    wrap.appendChild(time);
+    row.appendChild(avatar);
+    row.appendChild(wrap);
+    messagesEl.appendChild(row);
+    scrollToBottom();
   }
 
   isLoading = false;
