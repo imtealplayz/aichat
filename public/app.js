@@ -468,7 +468,14 @@ async function sendMessage() {
     hideThinking();
 
     if (!response.ok || data.error) {
-      const errMsg = "⚠️ " + (data.error || "Something went wrong.");
+      let errMsg;
+      if (response.status === 429 || data.rateLimited) {
+        errMsg = "🕐 The server is currently busy. Please wait a moment and try again.";
+      } else if (response.status === 500) {
+        errMsg = "⚠️ Something went wrong on our end. Please try again.";
+      } else {
+        errMsg = "⚠️ " + (data.error || "Something went wrong. Please try again.");
+      }
       appendMessageRow("bou", errMsg, true);
       const c = chats.find(x => x.id === chatId);
       if (c) { c.messages.push({ role: "assistant", content: errMsg }); saveChats(); }
@@ -478,7 +485,7 @@ async function sendMessage() {
   } catch (err) {
     hideThinking();
     if (err.name !== "AbortError") {
-      const errMsg = "⚠️ Could not reach the server. Please try again.";
+      const errMsg = "⚠️ Could not reach the server. Make sure you have a valid API key set in Vercel.";
       appendMessageRow("bou", errMsg, true);
       const c = chats.find(x => x.id === chatId);
       if (c) { c.messages.push({ role: "assistant", content: errMsg }); saveChats(); }
