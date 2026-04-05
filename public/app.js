@@ -293,8 +293,9 @@ function appendMessageRow(role, content, animate = true) {
     wrap.className = "msg-content";
 
     const bubble = document.createElement("div");
-    bubble.className = "bubble bou-bubble";
-    bubble.innerHTML = renderMarkdown(content);
+    const isError = content.startsWith("⚠️") || content.startsWith("🕐");
+    bubble.className = "bubble bou-bubble" + (isError ? " error-bubble" : "");
+    bubble.innerHTML = isError ? escHtml(content) : renderMarkdown(content);
 
     const time = document.createElement("span");
     time.className = "msg-time";
@@ -324,15 +325,15 @@ function showThinking() {
   avatar.innerHTML = `<img src="/images/bou-avatar.png" alt="Bou" />`;
 
   const wrap = document.createElement("div");
-  wrap.className = "msg-content";
+  wrap.className = "msg-content typing-wrap";
 
   const dots = document.createElement("div");
-  dots.className = "typing-dots";
+  dots.className = "typing-bubble";
   dots.innerHTML = "<span></span><span></span><span></span>";
 
   const label = document.createElement("span");
   label.className = "typing-label";
-  label.textContent = "Bou is thinking...";
+  label.textContent = "Bou is thinking…";
 
   wrap.appendChild(dots);
   wrap.appendChild(label);
