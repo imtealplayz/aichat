@@ -32,6 +32,10 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
           About
         </a>
+        <a href="#" class="nav-item" data-page="images" onclick="navigate('images'); return false;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          Images
+        </a>
         <a href="#" class="nav-item" data-page="info" onclick="navigate('info'); return false;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 8v4M12 16h.01"/></svg>
           Info
@@ -84,6 +88,10 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
           About
         </a>
+        <a href="#" class="nav-item" data-page="images" onclick="navigate('images'); return false;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          Images
+        </a>
         <a href="#" class="nav-item" data-page="info" onclick="navigate('info'); return false;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 8v4M12 16h.01"/></svg>
           Info
@@ -102,11 +110,11 @@
           <div class="welcome-state" id="welcomeState">
             <div class="welcome-avatar"><img src="/images/bou-avatar.png" alt="Bou" /></div>
             <h2>How can I help you?</h2>
-            <p>Ask me anything — questions, explanations, code, and more.</p>
+            <p>Ask me anything — questions, code, explanations, or ask me to generate an image.</p>
             <div class="chips">
               <button class="chip" onclick="fillSuggestion(this)">How does machine learning work?</button>
               <button class="chip" onclick="fillSuggestion(this)">Write a Python hello world</button>
-              <button class="chip" onclick="fillSuggestion(this)">RAM vs ROM — what's the difference?</button>
+              <button class="chip" onclick="fillSuggestion(this)">Generate an image of a sunset over mountains</button>
               <button class="chip" onclick="fillSuggestion(this)">5 tips for better sleep</button>
             </div>
           </div>
@@ -141,7 +149,7 @@
           <div class="card">
             <div class="card-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
             <h3>What is Bou?</h3>
-            <p>An AI-powered assistant that answers questions, explains concepts, and helps with everyday tasks — clearly and concisely.</p>
+            <p>An AI-powered assistant that answers questions, explains concepts, writes code, and generates images — clearly and concisely.</p>
           </div>
           <div class="card">
             <div class="card-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
@@ -176,6 +184,82 @@
       </div>
     </div>
 
+    <!-- IMAGES PAGE -->
+    <div class="page" id="page-images">
+      <div class="content-page">
+        <div class="page-hero">
+          <div class="hero-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" width="28" height="28">
+              <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+            </svg>
+          </div>
+          <h1>Image <em>Generation</em></h1>
+          <p>How Bou generates and saves images — and what you need to know.</p>
+        </div>
+
+        <div class="notice-box warn-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="16" height="16" style="flex-shrink:0;margin-top:2px;color:#fbbf24">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <div>
+            <strong style="color:#fbbf24">Images are saved as URLs — not files</strong>
+            <p>Generated images are stored as links to Pollinations.AI's servers, not as actual image files on your device. If their servers remove or change the image, it may no longer load. Download any image you want to keep permanently.</p>
+          </div>
+        </div>
+
+        <div class="info-list">
+          <div class="info-item">
+            <div class="info-ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            </div>
+            <div>
+              <h3>How to generate an image</h3>
+              <p>Just ask naturally — <em>"generate an image of a forest at night"</em> or <em>"draw a futuristic city"</em>. Bou will detect your intent and generate the image automatically. If your intent is unclear, Bou will ask first.</p>
+            </div>
+          </div>
+          <div class="info-item">
+            <div class="info-ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            </div>
+            <div>
+              <h3>Powered by Pollinations.AI</h3>
+              <p>Images are generated using <strong>Pollinations.AI</strong> — a free, no-key-required AI image service. It typically takes <strong>3–8 seconds</strong> per image. Occasionally longer during peak hours.</p>
+            </div>
+          </div>
+          <div class="info-item">
+            <div class="info-ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </div>
+            <div>
+              <h3>Downloading images</h3>
+              <p>Every generated image has a <strong>Download</strong> button. Click it to save the image to your device as a PNG file. We strongly recommend downloading any image you want to keep, as saved URLs may expire.</p>
+            </div>
+          </div>
+          <div class="info-item">
+            <div class="info-ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </div>
+            <div>
+              <h3>What Bou won't generate</h3>
+              <p>Bou will refuse image requests that involve violence, nudity, real identifiable people, or offensive content. The AI will tell you if a request is not allowed.</p>
+            </div>
+          </div>
+          <div class="info-item">
+            <div class="info-ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+            </div>
+            <div>
+              <h3>Where images are saved</h3>
+              <p>Image URLs are saved in your browser's localStorage alongside your chat history. They are stored <strong>on your device only</strong> and are never sent to our servers. Clearing site data will remove them.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="page-cta"><button onclick="navigate('chat')">Start chatting →</button></div>
+      </div>
+    </div>
+
     <!-- INFO PAGE -->
     <div class="page" id="page-info">
       <div class="content-page">
@@ -193,7 +277,7 @@
           </div>
           <div class="info-item">
             <div class="info-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
-            <div><h3>How chat history works</h3><p>Bou keeps a maximum of <strong>5 chats</strong>. When you start a 6th, the oldest is removed. Each chat is named by the AI based on your first message.</p></div>
+            <div><h3>Chat history limit</h3><p>Bou keeps a maximum of <strong>5 chats</strong>. When you start a 6th, the oldest is removed. Each chat is named by the AI based on your first message.</p></div>
           </div>
           <div class="info-item">
             <div class="info-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
