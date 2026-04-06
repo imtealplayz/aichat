@@ -243,6 +243,21 @@ function renderMessages() {
   }
 
   chat.messages.forEach(msg => {
+    // Check if it's a saved image message [image:URL:prompt]
+    if (msg.role === "assistant" && msg.content.startsWith("[image:")) {
+      // Format: [image:https://url/path:the prompt text]
+      // Find the prompt by looking after the URL (first occurrence of https://...?... ends before the colon before prompt)
+      const inner = msg.content.slice(7, msg.content.length - 1); // strip [image: and ]
+      // URL ends at the last ":" that is followed by non-slash (i.e. not part of https://)
+      const urlMatch = inner.match(/^(https?:\/\/\S+?):([^:].*)$/);
+      if (urlMatch) {
+        renderImageMessage(urlMatch[1], urlMatch[2]);
+      } else {
+        // Fallback: use full inner as URL
+        renderImageMessage(inner, "Generated image");
+      }
+      return;
+    }
     appendMessageRow(msg.role, msg.content, false);
   });
   scrollToBottom();
@@ -313,9 +328,11 @@ function appendMessageRow(role, content, animate = true) {
 }
 
 // ===========================
-// THINKING INDICATOR
+// THINKING / TYPING INDICATOR
 // ===========================
-function showThinking() {
+let typingInterval = null;
+
+function showThinking(mode = "thinking") {
   const row = document.createElement("div");
   row.className = "message-row bou-row typing-row";
   row.id = "thinkingRow";
@@ -333,7 +350,14 @@ function showThinking() {
 
   const label = document.createElement("span");
   label.className = "typing-label";
-  label.textContent = "Bou is thinking…";
+
+  const baseText = mode === "image" ? "Generating image" : "Bou is typing";
+  let dotCount = 1;
+  label.textContent = baseText + ".";
+  typingInterval = setInterval(() => {
+    dotCount = dotCount >= 3 ? 1 : dotCount + 1;
+    label.textContent = baseText + ".".repeat(dotCount);
+  }, 500);
 
   wrap.appendChild(dots);
   wrap.appendChild(label);
@@ -344,6 +368,7 @@ function showThinking() {
 }
 
 function hideThinking() {
+  if (typingInterval) { clearInterval(typingInterval); typingInterval = null; }
   document.getElementById("thinkingRow")?.remove();
 }
 
@@ -400,6 +425,167 @@ async function streamResponse(fullText, chatId) {
     chat.messages.push({ role: "assistant", content: finalText });
     saveChats();
   }
+}
+
+// ===========================
+// IMAGE GENERATION
+// ===========================
+async function generateImage(prompt, chatId) {
+  // Show "Generating image..." indicator
+  hideThinking();
+  showThinking("image");
+
+  const encodedPrompt = encodeURIComponent(prompt);
+  const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&seed=${Date.now()}`;
+
+  // Build generating card
+  const row = document.createElement("div");
+  row.className = "message-row bou-row";
+
+  const avatar = document.createElement("div");
+  avatar.className = "msg-avatar";
+  avatar.innerHTML = `<img src="/images/bou-avatar.png" alt="Bou" />`;
+
+  const wrap = document.createElement("div");
+  wrap.className = "msg-content";
+
+  // Use an actual img element and wait for it to load
+  const img = new Image();
+  img.src = imageUrl;
+  img.alt = prompt;
+  img.style.cssText = "width:100%;aspect-ratio:1/1;object-fit:cover;display:block;border-radius:0";
+
+  // Show shimmer while loading
+  const shimmerCard = document.createElement("div");
+  shimmerCard.className = "img-generating";
+  shimmerCard.innerHTML = `
+    <div class="img-shimmer">
+      <div class="img-shimmer-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <circle cx="8.5" cy="8.5" r="1.5"/>
+          <polyline points="21 15 16 10 5 21"/>
+        </svg>
+      </div>
+      <span class="img-shimmer-text">Generating image...</span>
+    </div>`;
+
+  wrap.appendChild(shimmerCard);
+
+  const time = document.createElement("span");
+  time.className = "msg-time";
+  time.textContent = getTime();
+  wrap.appendChild(time);
+  row.appendChild(avatar);
+  row.appendChild(wrap);
+  messagesEl.appendChild(row);
+  scrollToBottom();
+
+  // Wait for image to load or fail
+  await new Promise(resolve => {
+    img.onload  = resolve;
+    img.onerror = resolve;
+    // Max wait 20s
+    setTimeout(resolve, 20000);
+  });
+
+  hideThinking();
+
+  // Replace shimmer with real card or error
+  if (img.complete && img.naturalWidth > 0) {
+    const card = document.createElement("div");
+    card.className = "img-card";
+    card.appendChild(img);
+
+    const footer = document.createElement("div");
+    footer.className = "img-card-footer";
+
+    const promptEl = document.createElement("span");
+    promptEl.className = "img-card-prompt";
+    promptEl.textContent = prompt;
+
+    const dlBtn = document.createElement("button");
+    dlBtn.className = "img-download-btn";
+    dlBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download`;
+    dlBtn.onclick = () => downloadImage(imageUrl, prompt);
+
+    footer.appendChild(promptEl);
+    footer.appendChild(dlBtn);
+    card.appendChild(footer);
+    shimmerCard.replaceWith(card);
+
+    // Save to chat history as special image message
+    const c = chats.find(x => x.id === chatId);
+    if (c) {
+      c.messages.push({ role: "assistant", content: `[image:${imageUrl}:${prompt}]` });
+      saveChats();
+    }
+  } else {
+    const errEl = document.createElement("div");
+    errEl.className = "img-error";
+    errEl.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Could not generate the image. Please try again.`;
+    shimmerCard.replaceWith(errEl);
+  }
+  scrollToBottom();
+}
+
+function downloadImage(url, prompt) {
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = prompt.slice(0, 40).replace(/[^a-z0-9]/gi, "_") + ".png";
+  a.target = "_blank";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+// Render a saved image message from localStorage
+function renderImageMessage(imageUrl, prompt) {
+  const row = document.createElement("div");
+  row.className = "message-row bou-row";
+  row.style.animation = "none";
+
+  const avatar = document.createElement("div");
+  avatar.className = "msg-avatar";
+  avatar.innerHTML = `<img src="/images/bou-avatar.png" alt="Bou" />`;
+
+  const wrap = document.createElement("div");
+  wrap.className = "msg-content";
+
+  const card = document.createElement("div");
+  card.className = "img-card";
+
+  const img = document.createElement("img");
+  img.src = imageUrl;
+  img.alt = prompt;
+  img.style.cssText = "width:100%;aspect-ratio:1/1;object-fit:cover;display:block;border-radius:0";
+
+  const footer = document.createElement("div");
+  footer.className = "img-card-footer";
+
+  const promptEl = document.createElement("span");
+  promptEl.className = "img-card-prompt";
+  promptEl.textContent = prompt;
+
+  const dlBtn = document.createElement("button");
+  dlBtn.className = "img-download-btn";
+  dlBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download`;
+  dlBtn.onclick = () => downloadImage(imageUrl, prompt);
+
+  footer.appendChild(promptEl);
+  footer.appendChild(dlBtn);
+  card.appendChild(img);
+  card.appendChild(footer);
+  wrap.appendChild(card);
+
+  const time = document.createElement("span");
+  time.className = "msg-time";
+  time.textContent = "";
+  wrap.appendChild(time);
+
+  row.appendChild(avatar);
+  row.appendChild(wrap);
+  messagesEl.appendChild(row);
 }
 
 // ===========================
@@ -466,9 +652,9 @@ async function sendMessage() {
     });
 
     const data = await response.json();
-    hideThinking();
 
     if (!response.ok || data.error) {
+      hideThinking();
       let errMsg;
       if (response.status === 429 || data.rateLimited) {
         errMsg = "🕐 The server is currently busy. Please wait a moment and try again.";
@@ -480,7 +666,11 @@ async function sendMessage() {
       appendMessageRow("bou", errMsg, true);
       const c = chats.find(x => x.id === chatId);
       if (c) { c.messages.push({ role: "assistant", content: errMsg }); saveChats(); }
+    } else if (data.action === "generate_image" && data.prompt) {
+      // AI wants to generate an image
+      await generateImage(data.prompt, chatId);
     } else {
+      hideThinking();
       await streamResponse(data.reply, chatId);
     }
   } catch (err) {
