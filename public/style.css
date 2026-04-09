@@ -1104,3 +1104,31 @@ textarea::placeholder { color: var(--text-3); }
 
 /* Typing animation label */
 .typing-label { min-width: 130px; }
+
+/* ══════════════════════════════════════
+   MEMORY (Info page)
+══════════════════════════════════════ */
+.clear-memory-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  background: var(--red-dim);
+  border: 1px solid rgba(239,68,68,0.2);
+  border-radius: 6px;
+  color: var(--red);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 500;
+  transition: background 0.15s, border-color 0.15s;
+}
+.clear-memory-btn:hover {
+  background: rgba(239,68,68,0.2);
+  border-color: rgba(239,68,68,0.35);
+}
+#memorySummaryText {
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.8;
+  white-space: pre-wrap;
+}
