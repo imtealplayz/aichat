@@ -647,7 +647,7 @@ async function sendMessage() {
     const response = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text, history }),
+      body: JSON.stringify({ message: text, history, memoryContext: buildMemoryPrompt() }),
       signal: currentController.signal
     });
 
@@ -671,7 +671,10 @@ async function sendMessage() {
       await generateImage(data.prompt, chatId);
     } else {
       hideThinking();
+      hideThinking();
       await streamResponse(data.reply, chatId);
+      // Update memory from this exchange
+      updateMemoryFromConversation(text, data.reply);
     }
   } catch (err) {
     hideThinking();
@@ -811,4 +814,25 @@ window.addEventListener("load", () => {
 
   inputEl.addEventListener("input", updateSendBtn);
   inputEl.focus();
+
+  // Refresh memory summary whenever Info page is shown
+  document.querySelectorAll('.nav-item[data-page="info"]').forEach(el => {
+    el.addEventListener("click", refreshMemoryDisplay);
+  });
 });
+
+// ===========================
+// MEMORY UI
+// ===========================
+function refreshMemoryDisplay() {
+  const el = document.getElementById("memorySummaryText");
+  if (!el) return;
+  const summary = getMemorySummary();
+  el.textContent = summary.join("\n");
+}
+
+function handleClearMemory() {
+  if (!confirm("Clear all of Bou\'s memory about you? This cannot be undone.")) return;
+  clearMemory();
+  refreshMemoryDisplay();
+}
