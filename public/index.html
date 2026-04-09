@@ -3,7 +3,47 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bou — AI Assistant</title>
+
+  <!-- Primary SEO -->
+  <title>BouAI — Free AI Chatbot | Chat, Generate Images & Code</title>
+  <meta name="description" content="BouAI is a free AI assistant you can use right now — no sign-up needed. Chat with AI, generate images, get coding help, and more. Powered by advanced AI APIs." />
+  <meta name="keywords" content="Bou AI, BouAI, free AI chatbot, AI assistant, online AI tool, free AI chat, AI image generator, AI coding assistant, chat with AI" />
+  <meta name="author" content="Teal" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://bouai.vercel.app/" />
+
+  <!-- Open Graph (Discord, Facebook, WhatsApp previews) -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://bouai.vercel.app/" />
+  <meta property="og:title" content="BouAI — Free AI Chatbot | Chat, Images & Code" />
+  <meta property="og:description" content="Chat with Bou for free — no sign-up needed. AI chat, image generation, coding help, and more. Your data stays on your device." />
+  <meta property="og:image" content="https://bouai.vercel.app/images/bou-avatar.png" />
+  <meta property="og:site_name" content="BouAI" />
+  <meta property="og:locale" content="en_US" />
+
+  <!-- Twitter / X card -->
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="BouAI — Free AI Chatbot" />
+  <meta name="twitter:description" content="Free AI assistant — chat, generate images, get coding help. No sign-up needed." />
+  <meta name="twitter:image" content="https://bouai.vercel.app/images/bou-avatar.png" />
+
+  <!-- Structured data (Google rich results) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "BouAI",
+    "alternateName": ["Bou", "Bou AI"],
+    "url": "https://bouai.vercel.app/",
+    "description": "BouAI is a free AI chatbot and assistant. Chat with AI, generate images, and get coding help — no sign-up required.",
+    "applicationCategory": "UtilitiesApplication",
+    "operatingSystem": "Web",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "author": { "@type": "Person", "name": "Teal" },
+    "featureList": ["AI Chat", "Image Generation", "Coding Help", "File Analysis", "No Sign-up Required"]
+  }
+  </script>
+
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -12,12 +52,18 @@
 </head>
 <body>
 
+  <!-- Image zoom modal -->
+  <div class="zoom-modal" id="zoomModal" onclick="closeZoom()">
+    <button class="zoom-close" onclick="closeZoom()">✕</button>
+    <img id="zoomImg" src="" alt="Zoomed image" onclick="event.stopPropagation()" />
+  </div>
+
   <!-- SIDEBAR -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-top">
       <div class="sidebar-brand">
-        <div class="brand-avatar"><img src="/images/bou-avatar.png" alt="Bou" /></div>
-        <span class="brand-name">Bou</span>
+        <div class="brand-avatar"><img src="/images/bou-avatar.png" alt="BouAI logo" /></div>
+        <span class="brand-name">BouAI</span>
       </div>
       <button class="new-chat-btn" onclick="newChat()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
@@ -55,8 +101,8 @@
         <span></span><span></span><span></span>
       </button>
       <div class="topbar-brand">
-        <div class="brand-avatar sm"><img src="/images/bou-avatar.png" alt="Bou" /></div>
-        <span id="topbarTitle">Bou</span>
+        <div class="brand-avatar sm"><img src="/images/bou-avatar.png" alt="BouAI" /></div>
+        <span id="topbarTitle">BouAI</span>
       </div>
       <button class="topbar-new" onclick="newChat()" aria-label="New chat">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
@@ -69,8 +115,8 @@
   <div class="mobile-drawer" id="mobileDrawer">
     <div class="drawer-head">
       <div class="topbar-brand">
-        <div class="brand-avatar sm"><img src="/images/bou-avatar.png" alt="Bou" /></div>
-        <span>Bou</span>
+        <div class="brand-avatar sm"><img src="/images/bou-avatar.png" alt="BouAI" /></div>
+        <span>BouAI</span>
       </div>
       <button class="drawer-close" onclick="closeMobileMenu()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
@@ -106,22 +152,47 @@
     <!-- CHAT PAGE -->
     <div class="page active" id="page-chat">
       <div class="chat-layout">
+
+        <!-- File preview bar (hidden until file selected) -->
+        <div class="file-preview-bar" id="filePreviewBar" style="display:none">
+          <div class="file-preview-inner">
+            <div class="file-preview-info" id="filePreviewInfo"></div>
+            <button class="file-preview-remove" onclick="clearPendingFile()" title="Remove file">✕</button>
+          </div>
+        </div>
+
         <div class="messages-wrap" id="messages">
+          <!-- SEO-friendly hidden content for crawlers -->
+          <div class="seo-content" aria-hidden="true" style="display:none">
+            <h1>BouAI — Free AI Chatbot and Assistant</h1>
+            <h2>Chat with AI, generate images, and get coding help for free</h2>
+            <p>BouAI is a free online AI tool. Use it as an AI chatbot, an AI image generator, or a coding assistant. No sign-up required. Your data stays on your device.</p>
+          </div>
+
           <div class="welcome-state" id="welcomeState">
-            <div class="welcome-avatar"><img src="/images/bou-avatar.png" alt="Bou" /></div>
+            <div class="welcome-avatar"><img src="/images/bou-avatar.png" alt="BouAI assistant" /></div>
             <h2>How can I help you?</h2>
-            <p>Ask me anything — questions, code, explanations, or ask me to generate an image.</p>
+            <p>Free AI chat, image generation, coding help and more — no sign-up needed.</p>
             <div class="chips">
               <button class="chip" onclick="fillSuggestion(this)">How does machine learning work?</button>
               <button class="chip" onclick="fillSuggestion(this)">Write a Python hello world</button>
-              <button class="chip" onclick="fillSuggestion(this)">Generate an image of a sunset over mountains</button>
+              <button class="chip" onclick="fillSuggestion(this)">Generate an image of a forest at night</button>
               <button class="chip" onclick="fillSuggestion(this)">5 tips for better sleep</button>
             </div>
           </div>
         </div>
+
         <div class="input-wrap">
           <div class="input-shell" id="inputBox">
-            <textarea id="userInput" placeholder="Message Bou…" rows="1"
+            <!-- Hidden file input -->
+            <input type="file" id="fileInput" accept="image/*,.pdf,.txt,.md,.csv,.json,.js,.py,.html,.css,.ts,.java,.cpp,.c,.rb,.go,.rs" style="display:none" onchange="handleFileSelect(this)" />
+            <!-- Upload button -->
+            <button class="upload-btn" onclick="document.getElementById('fileInput').click()" title="Upload file or image">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+              </svg>
+            </button>
+            <textarea id="userInput" placeholder="Message BouAI…" rows="1"
               onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
             <button class="action-btn send" id="sendBtn" onclick="sendMessage()" disabled title="Send">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -132,7 +203,7 @@
               <svg viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2.5"/></svg>
             </button>
           </div>
-          <p class="input-note">Bou may make mistakes · Powered by AI (via API integration)</p>
+          <p class="input-note">BouAI may make mistakes · Powered by AI (via API integration)</p>
         </div>
       </div>
     </div>
@@ -141,36 +212,36 @@
     <div class="page" id="page-about">
       <div class="content-page">
         <div class="page-hero">
-          <div class="hero-avatar"><img src="/images/bou-avatar.png" alt="Bou" /></div>
-          <h1>Meet <em>Bou</em></h1>
-          <p>A professional AI assistant built for clarity, precision, and everyday helpfulness.</p>
+          <div class="hero-avatar"><img src="/images/bou-avatar.png" alt="BouAI" /></div>
+          <h1>Meet <em>BouAI</em></h1>
+          <p>A free AI assistant for chat, image generation, and coding help — no account required.</p>
         </div>
         <div class="card-grid">
           <div class="card">
             <div class="card-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
-            <h3>What is Bou?</h3>
-            <p>An AI-powered assistant that answers questions, explains concepts, writes code, and generates images — clearly and concisely.</p>
+            <h3>Free AI chat</h3>
+            <p>Ask anything — questions, explanations, advice. BouAI responds clearly and concisely, like a knowledgeable colleague.</p>
           </div>
           <div class="card">
-            <div class="card-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
-            <h3>How it works</h3>
-            <p>Messages go to a secure backend that queries an external AI API. Your API key is never exposed to the browser.</p>
+            <div class="card-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>
+            <h3>Image generation</h3>
+            <p>Just say "generate an image of…" — BouAI creates it automatically. Download or zoom into any generated image.</p>
           </div>
           <div class="card">
-            <div class="card-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
-            <h3>Privacy</h3>
-            <p>Chats are saved only on your device via localStorage. Nothing is stored on any server. See the Info page for full details.</p>
+            <div class="card-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></div>
+            <h3>Coding help</h3>
+            <p>Ask BouAI to write code in any language. Download the result as a file directly from the chat.</p>
           </div>
         </div>
         <div class="notice-box">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="15" height="15" style="flex-shrink:0;margin-top:2px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
           <div>
             <strong>Powered by AI (via API integration)</strong>
-            <p>Bou is not a proprietary AI. It is an interface built on third-party AI APIs. Responses may not always be accurate.</p>
+            <p>BouAI is not a proprietary AI. It uses third-party AI APIs (Groq, Gemini) to generate responses. It is free to use and your conversations are never stored on our servers.</p>
           </div>
         </div>
         <div class="creator-row">
-          <img src="/images/teal-avatar.jpg" alt="Teal" class="creator-img" />
+          <img src="/images/teal-avatar.jpg" alt="Teal, creator of BouAI" class="creator-img" />
           <div class="creator-text">
             <span class="creator-label">Created by</span>
             <span class="creator-name">Teal</span>
@@ -188,74 +259,35 @@
     <div class="page" id="page-images">
       <div class="content-page">
         <div class="page-hero">
-          <div class="hero-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" width="28" height="28">
-              <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
-            </svg>
-          </div>
+          <div class="hero-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" width="28" height="28"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>
           <h1>Image <em>Generation</em></h1>
-          <p>How Bou generates and saves images — and what you need to know.</p>
+          <p>How BouAI generates and saves images — and what you need to know.</p>
         </div>
-
         <div class="notice-box warn-box">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="16" height="16" style="flex-shrink:0;margin-top:2px;color:#fbbf24">
-            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-          </svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="16" height="16" style="flex-shrink:0;margin-top:2px;color:#fbbf24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           <div>
             <strong style="color:#fbbf24">Images are saved as URLs — not files</strong>
-            <p>Generated images are stored as links to Pollinations.AI's servers, not as actual image files on your device. If their servers remove or change the image, it may no longer load. Download any image you want to keep permanently.</p>
+            <p>Generated images are stored as links to Pollinations.AI's servers. Download any image you want to keep permanently using the Download button.</p>
           </div>
         </div>
-
         <div class="info-list">
           <div class="info-item">
-            <div class="info-ico">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-            </div>
-            <div>
-              <h3>How to generate an image</h3>
-              <p>Just ask naturally — <em>"generate an image of a forest at night"</em> or <em>"draw a futuristic city"</em>. Bou will detect your intent and generate the image automatically. If your intent is unclear, Bou will ask first.</p>
-            </div>
+            <div class="info-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+            <div><h3>How to generate an image</h3><p>Say "generate an image of a forest at night" or "draw a futuristic city". BouAI detects your intent and generates automatically. If unclear, it will ask first.</p></div>
           </div>
           <div class="info-item">
-            <div class="info-ico">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-            </div>
-            <div>
-              <h3>Powered by Pollinations.AI</h3>
-              <p>Images are generated using <strong>Pollinations.AI</strong> — a free, no-key-required AI image service. It typically takes <strong>3–8 seconds</strong> per image. Occasionally longer during peak hours.</p>
-            </div>
+            <div class="info-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
+            <div><h3>Powered by Pollinations.AI</h3><p>Free image generation, no key needed. Takes <strong>3–8 seconds</strong> per image. Click an image to zoom in. Use the Regenerate button for a new version.</p></div>
           </div>
           <div class="info-item">
-            <div class="info-ico">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            </div>
-            <div>
-              <h3>Downloading images</h3>
-              <p>Every generated image has a <strong>Download</strong> button. Click it to save the image to your device as a PNG file. We strongly recommend downloading any image you want to keep, as saved URLs may expire.</p>
-            </div>
+            <div class="info-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
+            <div><h3>Downloading images</h3><p>Every image has a Download button that saves it directly to your device as a PNG — no new tab required.</p></div>
           </div>
           <div class="info-item">
-            <div class="info-ico">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            </div>
-            <div>
-              <h3>What Bou won't generate</h3>
-              <p>Bou will refuse image requests that involve violence, nudity, real identifiable people, or offensive content. The AI will tell you if a request is not allowed.</p>
-            </div>
-          </div>
-          <div class="info-item">
-            <div class="info-ico">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-            </div>
-            <div>
-              <h3>Where images are saved</h3>
-              <p>Image URLs are saved in your browser's localStorage alongside your chat history. They are stored <strong>on your device only</strong> and are never sent to our servers. Clearing site data will remove them.</p>
-            </div>
+            <div class="info-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+            <div><h3>What BouAI won't generate</h3><p>Requests involving violence, nudity, real identifiable people, or offensive content will be refused.</p></div>
           </div>
         </div>
-
         <div class="page-cta"><button onclick="navigate('chat')">Start chatting →</button></div>
       </div>
     </div>
@@ -264,34 +296,23 @@
     <div class="page" id="page-info">
       <div class="content-page">
         <div class="page-hero">
-          <div class="hero-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" width="26" height="26"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 8v4M12 16h.01"/></svg>
-          </div>
-          <h1>How <em>Bou</em> saves chats</h1>
-          <p>Everything about how your data is stored and handled.</p>
+          <div class="hero-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" width="26" height="26"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 8v4M12 16h.01"/></svg></div>
+          <h1>How <em>BouAI</em> works</h1>
+          <p>Privacy, data storage, and how everything fits together.</p>
         </div>
         <div class="info-list">
           <div class="info-item">
             <div class="info-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
-            <div><h3>Stored on your device only</h3><p>Bou uses <strong>localStorage</strong> — built into your browser. Conversations never leave your device and are not sent anywhere for storage.</p></div>
+            <div><h3>Stored on your device only</h3><p>BouAI uses <strong>localStorage</strong>. Conversations never leave your device and are not sent anywhere for storage.</p></div>
           </div>
           <div class="info-item">
             <div class="info-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
-            <div><h3>Chat history limit</h3><p>Bou keeps a maximum of <strong>5 chats</strong>. When you start a 6th, the oldest is removed. Each chat is named by the AI based on your first message.</p></div>
-          </div>
-          <div class="info-item">
-            <div class="info-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
-            <div><h3>What gets cleared</h3><p>History is lost if you clear browser site data or use incognito mode. Chats don't sync across devices or browsers.</p></div>
+            <div><h3>Chat history limit</h3><p>BouAI keeps a maximum of <strong>5 chats</strong>. When you start a 6th, the oldest is removed. Each chat is named by AI based on your first message.</p></div>
           </div>
           <div class="info-item">
             <div class="info-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
-            <div><h3>What we don't collect</h3><p>No name, email, IP, or personal info is ever collected. Messages are sent to the AI API only to generate a response — not stored or logged by us.</p></div>
+            <div><h3>What we don't collect</h3><p>No name, email, IP, or personal info is ever collected. Messages are sent to AI APIs only to generate responses — not stored or logged by us.</p></div>
           </div>
-          <div class="info-item">
-            <div class="info-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg></div>
-            <div><h3>How to clear chats</h3><p>Click <strong>✕</strong> next to any chat in the sidebar. To clear everything, clear site data for this site in your browser settings.</p></div>
-          </div>
-        </div>
           <div class="info-item" id="memoryInfoItem">
             <div class="info-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 2a9 9 0 0 1 9 9c0 3.87-2.44 7.17-6 8.48V21H9v-1.52C5.44 18.17 3 14.87 3 11a9 9 0 0 1 9-9z"/><path d="M9 21h6"/></svg></div>
             <div>
@@ -300,6 +321,11 @@
               <button onclick="handleClearMemory()" class="clear-memory-btn" style="margin-top:10px">Clear all memory</button>
             </div>
           </div>
+          <div class="info-item">
+            <div class="info-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg></div>
+            <div><h3>How to clear chats</h3><p>Click <strong>✕</strong> next to any chat in the sidebar. To clear everything, clear site data for this site in your browser settings.</p></div>
+          </div>
+        </div>
         <div class="page-cta"><button onclick="navigate('chat')">Back to chat →</button></div>
       </div>
     </div>
