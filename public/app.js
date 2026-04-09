@@ -13,6 +13,7 @@ let activeChatId = null;
 let isLoading    = false;
 let stopRequested = false;
 let currentController = null; // AbortController for fetch
+let pendingFile = null;       // { fileContext, fileName, fileType, previewUrl }
 
 // ===========================
 // DOM REFS
@@ -30,7 +31,7 @@ function showPage(name) {
   const page = document.getElementById("page-" + name);
   if (page) page.classList.add("active");
   // Update topbar title
-  const titles = { chat: "Bou", about: "About", info: "Info" };
+  const titles = { chat: "BouAI", about: "About", images: "Images", info: "Info" };
   const titleEl = document.getElementById("topbarTitle");
   if (titleEl) titleEl.textContent = titles[name] || "Bou";
   // Update active nav items by data-page attribute
@@ -612,6 +613,7 @@ async function sendMessage() {
 
   inputEl.value = "";
   inputEl.style.height = "auto";
+  clearPendingFile();
 
   const chat = getActiveChat();
   if (!chat) return;
@@ -647,7 +649,7 @@ async function sendMessage() {
     const response = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text, history, memoryContext: buildMemoryPrompt() }),
+      body: JSON.stringify({ message: text, history, memoryContext: buildMemoryPrompt(), fileContext: pendingFile?.fileContext || null }),
       signal: currentController.signal
     });
 
@@ -667,13 +669,17 @@ async function sendMessage() {
       const c = chats.find(x => x.id === chatId);
       if (c) { c.messages.push({ role: "assistant", content: errMsg }); saveChats(); }
     } else if (data.action === "generate_image" && data.prompt) {
-      // AI wants to generate an image
       await generateImage(data.prompt, chatId);
+    } else if (data.action === "coding" && data.code) {
+      hideThinking();
+      await showCodeResult(data, chatId, text);
+      updateMemoryFromConversation(text, data.code);
+    } else if (data.action === "coding_too_long" && data.message) {
+      hideThinking();
+      await streamResponse(data.message, chatId);
     } else {
       hideThinking();
-      hideThinking();
       await streamResponse(data.reply, chatId);
-      // Update memory from this exchange
       updateMemoryFromConversation(text, data.reply);
     }
   } catch (err) {
@@ -835,4 +841,471 @@ function handleClearMemory() {
   if (!confirm("Clear all of Bou\'s memory about you? This cannot be undone.")) return;
   clearMemory();
   refreshMemoryDisplay();
+}
+
+// ===========================
+// FILE UPLOAD
+// ===========================
+async function handleFileSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = ""; // reset so same file can be reselected
+
+  const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+  if (file.size > MAX_SIZE) {
+    alert("File is too large. Please upload a file under 10MB.");
+    return;
+  }
+
+  const textTypes = [
+    "text/plain","text/markdown","text/csv","application/json",
+    "text/javascript","text/html","text/css","text/x-python",
+    "text/x-java","text/x-c","application/x-ruby","text/x-go",
+    "application/x-typescript"
+  ];
+  const isText = textTypes.includes(file.type) || /\.(txt|md|csv|json|js|py|html|css|ts|java|cpp|c|rb|go|rs)$/i.test(file.name);
+  const isImage = file.type.startsWith("image/");
+  const isPDF = file.type === "application/pdf";
+
+  showFilePreview(file.name, isImage ? "image" : isPDF ? "pdf" : "file");
+
+  try {
+    if (isText) {
+      // Read as text directly
+      const text = await file.text();
+      pendingFile = {
+        fileContext: `File: ${file.name}\n\nContent:\n${text.slice(0, 8000)}`,
+        fileName: file.name,
+        fileType: "text"
+      };
+    } else if (isImage || isPDF) {
+      // Convert to base64 and send to vision API
+      const base64 = await toBase64(file);
+      showFilePreview(file.name, isImage ? "image" : "pdf", true); // loading state
+
+      const res = await fetch("/api/vision", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ base64, mimeType: file.type, fileName: file.name })
+      });
+      const data = await res.json();
+
+      if (data.error) {
+        clearPendingFile();
+        alert("Could not read file: " + data.error);
+        return;
+      }
+
+      pendingFile = {
+        fileContext: data.fileContext,
+        fileName: file.name,
+        fileType: isImage ? "image" : "pdf"
+      };
+      showFilePreview(file.name, isImage ? "image" : "pdf", false);
+    } else {
+      alert("Unsupported file type. Please upload an image, PDF, or text file.");
+    }
+    updateSendBtn();
+  } catch (err) {
+    clearPendingFile();
+    alert("Error reading file. Please try again.");
+  }
+}
+
+function toBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(",")[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function showFilePreview(fileName, type, loading = false) {
+  const bar = document.getElementById("filePreviewBar");
+  const info = document.getElementById("filePreviewInfo");
+  if (!bar || !info) return;
+
+  const icons = {
+    image: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="14" height="14"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`,
+    pdf:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="14" height="14"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`,
+    file:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="14" height="14"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`
+  };
+
+  info.innerHTML = `${icons[type] || icons.file} ${escHtml(fileName)}${loading ? " — Reading…" : " — Ready"}`;
+  bar.style.display = "block";
+}
+
+function clearPendingFile() {
+  pendingFile = null;
+  const bar = document.getElementById("filePreviewBar");
+  if (bar) bar.style.display = "none";
+  updateSendBtn();
+}
+
+// ===========================
+// IMAGE ZOOM
+// ===========================
+function openZoom(url) {
+  const modal = document.getElementById("zoomModal");
+  const img   = document.getElementById("zoomImg");
+  if (!modal || !img) return;
+  img.src = url;
+  modal.classList.add("open");
+  document.body.style.overflow = "hidden";
+}
+
+function closeZoom() {
+  const modal = document.getElementById("zoomModal");
+  if (modal) modal.classList.remove("open");
+  document.body.style.overflow = "";
+}
+
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeZoom(); });
+
+// ===========================
+// IMAGE DOWNLOAD (direct)
+// ===========================
+async function downloadImageDirect(url, prompt) {
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = (prompt || "image").slice(0, 40).replace(/[^a-z0-9]/gi, "_") + ".png";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+  } catch {
+    // Fallback if CORS blocks blob download
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = (prompt || "image").slice(0, 40).replace(/[^a-z0-9]/gi, "_") + ".png";
+    a.target = "_blank";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+}
+
+// ===========================
+// IMAGE REGENERATE
+// ===========================
+async function regenerateImage(prompt, chatId, cardEl) {
+  const newSeed = Date.now();
+  const newUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&seed=${newSeed}`;
+
+  // Show shimmer inside existing card
+  const imgEl = cardEl.querySelector("img");
+  if (imgEl) {
+    imgEl.style.opacity = "0.3";
+    imgEl.style.filter  = "blur(4px)";
+  }
+
+  const newImg = new Image();
+  newImg.src = newUrl;
+
+  await new Promise(resolve => {
+    newImg.onload  = resolve;
+    newImg.onerror = resolve;
+    setTimeout(resolve, 20000);
+  });
+
+  if (imgEl) {
+    imgEl.src = newUrl;
+    imgEl.style.opacity = "1";
+    imgEl.style.filter  = "";
+    imgEl.onclick = () => openZoom(newUrl);
+  }
+
+  // Update download and regen buttons
+  const dlBtn = cardEl.querySelector(".img-action-btn.download");
+  if (dlBtn) dlBtn.onclick = () => downloadImageDirect(newUrl, prompt);
+  const regenBtn = cardEl.querySelector(".img-action-btn.regen");
+  if (regenBtn) regenBtn.onclick = () => regenerateImage(prompt, chatId, cardEl);
+
+  // Update saved URL in chat history
+  const c = chats.find(x => x.id === chatId);
+  if (c) {
+    const idx = c.messages.findLastIndex(m => m.content && m.content.startsWith("[image:"));
+    if (idx >= 0) {
+      c.messages[idx].content = `[image:${newUrl}:${prompt}]`;
+      saveChats();
+    }
+  }
+}
+
+// ===========================
+// UPDATED generateImage
+// (fixes "can't generate second image" bug)
+// ===========================
+async function generateImage(prompt, chatId) {
+  hideThinking();
+  showThinking("image");
+
+  const seed    = Date.now();
+  const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&seed=${seed}`;
+
+  const row = document.createElement("div");
+  row.className = "message-row bou-row";
+
+  const avatar = document.createElement("div");
+  avatar.className = "msg-avatar";
+  avatar.innerHTML = `<img src="/images/bou-avatar.png" alt="Bou" />`;
+
+  const wrap = document.createElement("div");
+  wrap.className = "msg-content";
+
+  const shimmerCard = document.createElement("div");
+  shimmerCard.className = "img-generating";
+  shimmerCard.innerHTML = `
+    <div class="img-shimmer">
+      <div class="img-shimmer-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+          <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+        </svg>
+      </div>
+      <span class="img-shimmer-text">Generating image...</span>
+    </div>`;
+
+  const time = document.createElement("span");
+  time.className = "msg-time";
+  time.textContent = getTime();
+
+  wrap.appendChild(shimmerCard);
+  wrap.appendChild(time);
+  row.appendChild(avatar);
+  row.appendChild(wrap);
+  messagesEl.appendChild(row);
+  scrollToBottom();
+
+  // Load image
+  const img = new Image();
+  img.src = imageUrl;
+  img.alt = prompt;
+
+  await new Promise(resolve => {
+    img.onload  = resolve;
+    img.onerror = resolve;
+    setTimeout(resolve, 20000);
+  });
+
+  hideThinking();
+
+  if (img.complete && img.naturalWidth > 0) {
+    // Success — build card
+    const card = document.createElement("div");
+    card.className = "img-card";
+
+    img.style.cssText = "width:100%;aspect-ratio:1/1;object-fit:cover;display:block;border-radius:0;cursor:zoom-in";
+    img.onclick = () => openZoom(imageUrl);
+
+    const footer = document.createElement("div");
+    footer.className = "img-card-footer";
+
+    const promptEl = document.createElement("span");
+    promptEl.className = "img-card-prompt";
+    promptEl.textContent = prompt;
+
+    const dlBtn = document.createElement("button");
+    dlBtn.className = "img-action-btn download";
+    dlBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download`;
+    dlBtn.onclick = () => downloadImageDirect(imageUrl, prompt);
+
+    const regenBtn = document.createElement("button");
+    regenBtn.className = "img-action-btn regen";
+    regenBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>Regenerate`;
+    regenBtn.onclick = () => regenerateImage(prompt, chatId, card);
+
+    footer.appendChild(promptEl);
+    footer.appendChild(dlBtn);
+    footer.appendChild(regenBtn);
+    card.appendChild(img);
+    card.appendChild(footer);
+    shimmerCard.replaceWith(card);
+
+    // Save
+    const c = chats.find(x => x.id === chatId);
+    if (c) {
+      c.messages.push({ role: "assistant", content: `[image:${imageUrl}:${prompt}]` });
+      saveChats();
+    }
+  } else {
+    const errEl = document.createElement("div");
+    errEl.className = "img-error";
+    errEl.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="15" height="15"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Could not generate the image. Please try again.`;
+    shimmerCard.replaceWith(errEl);
+  }
+  scrollToBottom();
+
+  // ✅ KEY FIX: Reset loading state so user can send again without refresh
+  setLoadingState(false);
+  updateSendBtn();
+  inputEl.focus();
+}
+
+// ===========================
+// CODE RESULT (collapsible panel)
+// ===========================
+async function showCodeResult(data, chatId, userText) {
+  const { language, filename, task, code } = data;
+
+  const row = document.createElement("div");
+  row.className = "message-row bou-row";
+  row.style.animation = "none";
+
+  const avatar = document.createElement("div");
+  avatar.className = "msg-avatar";
+  avatar.innerHTML = `<img src="/images/bou-avatar.png" alt="Bou" />`;
+
+  const wrap = document.createElement("div");
+  wrap.className = "msg-content";
+  wrap.style.maxWidth = "calc(100% - 44px)";
+
+  // Collapsible thinking panel
+  const panel = document.createElement("div");
+  panel.className = "thinking-panel";
+  panel.innerHTML = `
+    <div class="thinking-panel-header" onclick="toggleThinkingPanel(this.parentElement)">
+      <div class="thinking-panel-left">
+        <div class="thinking-dot done"></div>
+        <span>Worked on: <strong>${escHtml(task || language + " code")}</strong></span>
+      </div>
+      <span class="thinking-chevron">▼</span>
+    </div>
+    <div class="thinking-panel-body">
+      <pre>Writing ${escHtml(language)} code for: ${escHtml(task || userText)}\nFilename: ${escHtml(filename || "code." + language)}\nLines: ${code.split('\n').length}</pre>
+    </div>`;
+
+  // Code result card
+  const card = document.createElement("div");
+  card.className = "code-result-card";
+
+  const header = document.createElement("div");
+  header.className = "code-result-header";
+  header.innerHTML = `
+    <div class="code-result-meta">
+      <span class="code-result-lang">${escHtml(language)}</span>
+      <span class="code-result-task">${escHtml(filename || task || "")}</span>
+    </div>
+    <div class="code-result-actions">
+      <button class="code-action-btn copy" onclick="copyCodeResult(this, ${JSON.stringify(code)})">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy
+      </button>
+      <button class="code-action-btn download" onclick="downloadCode(${JSON.stringify(code)}, ${JSON.stringify(filename || 'code.' + language)})">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download
+      </button>
+    </div>`;
+
+  const pre = document.createElement("pre");
+  pre.className = "code-result-pre";
+  const codeEl = document.createElement("code");
+  codeEl.textContent = code;
+  pre.appendChild(codeEl);
+
+  card.appendChild(header);
+  card.appendChild(pre);
+
+  const time = document.createElement("span");
+  time.className = "msg-time";
+  time.textContent = getTime();
+
+  wrap.appendChild(panel);
+  wrap.appendChild(card);
+  wrap.appendChild(time);
+  row.appendChild(avatar);
+  row.appendChild(wrap);
+  messagesEl.appendChild(row);
+  scrollToBottom();
+
+  // Save to chat history
+  const c = chats.find(x => x.id === chatId);
+  if (c) {
+    c.messages.push({ role: "assistant", content: "```" + language + "\n" + code + "\n```" });
+    saveChats();
+  }
+}
+
+function toggleThinkingPanel(panel) {
+  panel.classList.toggle("open");
+}
+
+function copyCodeResult(btn, code) {
+  navigator.clipboard.writeText(code).then(() => {
+    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>Copied!`;
+    btn.classList.add("copied");
+    setTimeout(() => {
+      btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy`;
+      btn.classList.remove("copied");
+    }, 2000);
+  });
+}
+
+function downloadCode(code, filename) {
+  const blob = new Blob([code], { type: "text/plain" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href     = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
+}
+
+// Also update renderImageMessage to include zoom + regen + direct download
+function renderImageMessage(imageUrl, prompt) {
+  const row = document.createElement("div");
+  row.className = "message-row bou-row";
+  row.style.animation = "none";
+
+  const avatar = document.createElement("div");
+  avatar.className = "msg-avatar";
+  avatar.innerHTML = `<img src="/images/bou-avatar.png" alt="Bou" />`;
+
+  const wrap = document.createElement("div");
+  wrap.className = "msg-content";
+
+  const card = document.createElement("div");
+  card.className = "img-card";
+
+  const img = document.createElement("img");
+  img.src = imageUrl;
+  img.alt = prompt;
+  img.style.cssText = "width:100%;aspect-ratio:1/1;object-fit:cover;display:block;border-radius:0;cursor:zoom-in";
+  img.onclick = () => openZoom(imageUrl);
+
+  const footer = document.createElement("div");
+  footer.className = "img-card-footer";
+
+  const promptEl = document.createElement("span");
+  promptEl.className = "img-card-prompt";
+  promptEl.textContent = prompt;
+
+  const dlBtn = document.createElement("button");
+  dlBtn.className = "img-action-btn download";
+  dlBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download`;
+  dlBtn.onclick = () => downloadImageDirect(imageUrl, prompt);
+
+  const regenBtn = document.createElement("button");
+  regenBtn.className = "img-action-btn regen";
+  regenBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>Regenerate`;
+  regenBtn.onclick = () => regenerateImage(prompt, null, card);
+
+  footer.appendChild(promptEl);
+  footer.appendChild(dlBtn);
+  footer.appendChild(regenBtn);
+  card.appendChild(img);
+  card.appendChild(footer);
+  wrap.appendChild(card);
+
+  const time = document.createElement("span");
+  time.className = "msg-time";
+  time.textContent = "";
+  wrap.appendChild(time);
+  row.appendChild(avatar);
+  row.appendChild(wrap);
+  messagesEl.appendChild(row);
 }
