@@ -292,11 +292,20 @@
             <div><h3>How to clear chats</h3><p>Click <strong>✕</strong> next to any chat in the sidebar. To clear everything, clear site data for this site in your browser settings.</p></div>
           </div>
         </div>
+          <div class="info-item" id="memoryInfoItem">
+            <div class="info-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 2a9 9 0 0 1 9 9c0 3.87-2.44 7.17-6 8.48V21H9v-1.52C5.44 18.17 3 14.87 3 11a9 9 0 0 1 9-9z"/><path d="M9 21h6"/></svg></div>
+            <div>
+              <h3>Memory</h3>
+              <p id="memorySummaryText">Loading memory...</p>
+              <button onclick="handleClearMemory()" class="clear-memory-btn" style="margin-top:10px">Clear all memory</button>
+            </div>
+          </div>
         <div class="page-cta"><button onclick="navigate('chat')">Back to chat →</button></div>
       </div>
     </div>
 
   </main>
+  <script src="memory.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
