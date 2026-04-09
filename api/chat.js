@@ -114,8 +114,13 @@ module.exports = async (req, res) => {
 
   const groqKeys = getGroqKeys();
 
-  // Build message array
-  const messages = [{ role: "system", content: SYSTEM_PROMPT }];
+  // Build message array — inject memory context into system prompt if provided
+  const memoryContext = (typeof req.body.memoryContext === "string" && req.body.memoryContext.length < 2000)
+    ? req.body.memoryContext
+    : "";
+  const fullSystemPrompt = SYSTEM_PROMPT + memoryContext;
+
+  const messages = [{ role: "system", content: fullSystemPrompt }];
   if (Array.isArray(history)) {
     for (const turn of history.slice(-6)) {
       messages.push({ role: turn.role === "assistant" ? "assistant" : "user", content: turn.content });
