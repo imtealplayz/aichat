@@ -982,45 +982,73 @@ async function downloadImageDirect(url, prompt) {
 // IMAGE REGENERATE
 // ===========================
 async function regenerateImage(prompt, chatId, cardEl) {
+  if (!prompt || !cardEl) return;
+
   const newSeed = Date.now();
   const newUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&seed=${newSeed}`;
 
-  // Show shimmer inside existing card
+  // Disable regen button and show loading state
+  const regenBtn = cardEl.querySelector(".img-action-btn.regen");
+  if (regenBtn) {
+    regenBtn.disabled = true;
+    regenBtn.style.opacity = "0.5";
+  }
+
+  // Blur existing image while loading
   const imgEl = cardEl.querySelector("img");
   if (imgEl) {
     imgEl.style.opacity = "0.3";
-    imgEl.style.filter  = "blur(4px)";
+    imgEl.style.filter  = "blur(6px)";
+    imgEl.style.transition = "opacity 0.3s, filter 0.3s";
   }
 
+  // Preload new image
   const newImg = new Image();
+  newImg.crossOrigin = "anonymous";
   newImg.src = newUrl;
 
   await new Promise(resolve => {
     newImg.onload  = resolve;
     newImg.onerror = resolve;
-    setTimeout(resolve, 20000);
+    setTimeout(resolve, 25000);
   });
 
-  if (imgEl) {
+  // Swap in new image
+  if (imgEl && newImg.naturalWidth > 0) {
     imgEl.src = newUrl;
     imgEl.style.opacity = "1";
     imgEl.style.filter  = "";
     imgEl.onclick = () => openZoom(newUrl);
+  } else if (imgEl) {
+    // Failed — restore original
+    imgEl.style.opacity = "1";
+    imgEl.style.filter  = "";
   }
 
-  // Update download and regen buttons
+  // Re-enable regen button and update handlers
+  if (regenBtn) {
+    regenBtn.disabled = false;
+    regenBtn.style.opacity = "";
+    regenBtn.onclick = () => regenerateImage(prompt, chatId, cardEl);
+  }
+
   const dlBtn = cardEl.querySelector(".img-action-btn.download");
-  if (dlBtn) dlBtn.onclick = () => downloadImageDirect(newUrl, prompt);
-  const regenBtn = cardEl.querySelector(".img-action-btn.regen");
-  if (regenBtn) regenBtn.onclick = () => regenerateImage(prompt, chatId, cardEl);
+  if (dlBtn && newImg.naturalWidth > 0) {
+    dlBtn.onclick = () => downloadImageDirect(newUrl, prompt);
+  }
 
   // Update saved URL in chat history
-  const c = chats.find(x => x.id === chatId);
-  if (c) {
-    const idx = c.messages.findLastIndex(m => m.content && m.content.startsWith("[image:"));
-    if (idx >= 0) {
-      c.messages[idx].content = `[image:${newUrl}:${prompt}]`;
-      saveChats();
+  if (chatId && newImg.naturalWidth > 0) {
+    const c = chats.find(x => x.id === chatId);
+    if (c) {
+      // Find last image message and update it
+      for (let i = c.messages.length - 1; i >= 0; i--) {
+        if (c.messages[i].content && c.messages[i].content.startsWith("[image:")) {
+          c.messages[i].content = `[image:${newUrl}:${prompt}]`;
+          saveChats();
+          break;
+        }
+      }
     }
   }
 }
