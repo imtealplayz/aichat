@@ -113,6 +113,44 @@ async function callGemini(messages) {
   return data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
 }
 
+// Detect if the user is asking for code to be written
+function isCodingRequest(msg) {
+  return /(write|create|build|make|code|implement|generate|develop|script|program).{0,40}(code|function|script|program|class|app|application|component|module|api|server|html|css|javascript|python|java|c\+\+|sql|bash|shell)/i.test(msg)
+    || /(code|script|program|function|implement|build me)/i.test(msg);
+}
+
+// Call Claude for coding tasks
+async function callClaude(messages) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return null;
+
+  // Convert messages for Claude API
+  const systemMsg = messages.find(m => m.role === "system");
+  const turns = messages.filter(m => m.role !== "system");
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01"
+    },
+    body: JSON.stringify({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 4096,
+      system: systemMsg ? systemMsg.content : undefined,
+      messages: turns.map(m => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }))
+    })
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    console.error("[Bou] Claude error:", data?.error?.message);
+    return null;
+  }
+  return data?.content?.[0]?.text || null;
+}
+
 function parseActionFromReply(reply) {
   const trimmed = reply.trim();
   // Try to find JSON action in the response
@@ -158,7 +196,22 @@ module.exports = async (req, res) => {
   }
   messages.push({ role: "user", content: finalMessage });
 
-  // Try Groq keys
+  // Route coding requests to Claude if key is available
+  if (isCodingRequest(message)) {
+    console.log("[Bou] Coding request detected — trying Claude first...");
+    try {
+      const claudeReply = await callClaude(messages);
+      if (claudeReply) {
+        const action = parseActionFromReply(claudeReply);
+        if (action) return res.status(200).json(action);
+        return res.status(200).json({ reply: claudeReply, via: "claude" });
+      }
+    } catch (err) {
+      console.warn("[Bou] Claude failed, falling back to Groq:", err.message);
+    }
+  }
+
+  // Try Groq keys (all non-coding requests, or if Claude failed)
   for (let i = 0; i < groqKeys.length; i++) {
     try {
       const { status, data } = await callGroq(groqKeys[i], messages);
