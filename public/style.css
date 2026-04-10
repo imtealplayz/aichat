@@ -773,7 +773,7 @@ textarea::placeholder { color: var(--text-3); }
 /* ══════════════════════════════════════
    CONTENT PAGES (About / Info)
 ══════════════════════════════════════ */
-#page-about, #page-info { overflow-y: auto; }
+#page-about, #page-info, #page-images { overflow-y: auto; }
 
 .content-page {
   max-width: 680px;
