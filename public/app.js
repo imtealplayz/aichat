@@ -259,7 +259,7 @@ function renderMessages() {
       }
       return;
     }
-    appendMessageRow(msg.role, msg.content, false);
+    appendMessageRow(msg.role, msg.content, false, msg.ts || null);
   });
   scrollToBottom();
 }
@@ -275,7 +275,13 @@ function getTime() {
   return new Date().toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" });
 }
 
-function appendMessageRow(role, content, animate = true) {
+function formatSavedTime(isoString) {
+  try {
+    return new Date(isoString).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" });
+  } catch { return ""; }
+}
+
+function appendMessageRow(role, content, animate = true, savedTs = null) {
   const row = document.createElement("div");
   row.className = "message-row " + (role === "user" ? "user-row" : "bou-row");
   if (!animate) row.style.animation = "none";
@@ -294,7 +300,7 @@ function appendMessageRow(role, content, animate = true) {
 
     const time = document.createElement("span");
     time.className = "msg-time";
-    time.textContent = getTime();
+    time.textContent = savedTs ? formatSavedTime(savedTs) : getTime();
 
     wrap.appendChild(bubble);
     wrap.appendChild(time);
@@ -315,7 +321,7 @@ function appendMessageRow(role, content, animate = true) {
 
     const time = document.createElement("span");
     time.className = "msg-time";
-    time.textContent = getTime();
+    time.textContent = savedTs ? formatSavedTime(savedTs) : getTime();
 
     wrap.appendChild(bubble);
     wrap.appendChild(time);
@@ -423,7 +429,7 @@ async function streamResponse(fullText, chatId) {
   // Save to chat
   const chat = chats.find(c => c.id === chatId);
   if (chat) {
-    chat.messages.push({ role: "assistant", content: finalText });
+    chat.messages.push({ role: "assistant", content: finalText, ts: new Date().toISOString() });
     saveChats();
   }
 }
@@ -518,7 +524,7 @@ async function generateImage(prompt, chatId) {
     // Save to chat history as special image message
     const c = chats.find(x => x.id === chatId);
     if (c) {
-      c.messages.push({ role: "assistant", content: `[image:${imageUrl}:${prompt}]` });
+      c.messages.push({ role: "assistant", content: `[image:${imageUrl}:${prompt}]`, ts: new Date().toISOString() });
       saveChats();
     }
   } else {
@@ -621,7 +627,7 @@ async function sendMessage() {
   const isFirstMessage = chat.messages.length === 0;
 
   // Save user message
-  chat.messages.push({ role: "user", content: text });
+  chat.messages.push({ role: "user", content: text, ts: new Date().toISOString() });
   saveChats();
 
   // Render user message
@@ -667,7 +673,7 @@ async function sendMessage() {
       }
       appendMessageRow("bou", errMsg, true);
       const c = chats.find(x => x.id === chatId);
-      if (c) { c.messages.push({ role: "assistant", content: errMsg }); saveChats(); }
+      if (c) { c.messages.push({ role: "assistant", content: errMsg, ts: new Date().toISOString() }); saveChats(); }
     } else if (data.action === "generate_image" && data.prompt) {
       await generateImage(data.prompt, chatId);
     } else if (data.action === "coding" && data.code) {
@@ -688,7 +694,7 @@ async function sendMessage() {
       const errMsg = "⚠️ Could not reach the server. Make sure you have a valid API key set in Vercel.";
       appendMessageRow("bou", errMsg, true);
       const c = chats.find(x => x.id === chatId);
-      if (c) { c.messages.push({ role: "assistant", content: errMsg }); saveChats(); }
+      if (c) { c.messages.push({ role: "assistant", content: errMsg, ts: new Date().toISOString() }); saveChats(); }
     }
   }
 
@@ -849,66 +855,48 @@ function handleClearMemory() {
 async function handleFileSelect(input) {
   const file = input.files[0];
   if (!file) return;
-  input.value = ""; // reset so same file can be reselected
+  input.value = "";
 
-  const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+  const MAX_SIZE = 4 * 1024 * 1024; // 4MB (Gemini limit)
   if (file.size > MAX_SIZE) {
-    alert("File is too large. Please upload a file under 10MB.");
+    alert("Image is too large. Please upload an image under 4MB.");
     return;
   }
 
-  const textTypes = [
-    "text/plain","text/markdown","text/csv","application/json",
-    "text/javascript","text/html","text/css","text/x-python",
-    "text/x-java","text/x-c","application/x-ruby","text/x-go",
-    "application/x-typescript"
-  ];
-  const isText = textTypes.includes(file.type) || /\.(txt|md|csv|json|js|py|html|css|ts|java|cpp|c|rb|go|rs)$/i.test(file.name);
   const isImage = file.type.startsWith("image/");
-  const isPDF = file.type === "application/pdf";
+  if (!isImage) {
+    alert("Only image files are supported (JPG, PNG, WEBP, GIF).");
+    return;
+  }
 
-  showFilePreview(file.name, isImage ? "image" : isPDF ? "pdf" : "file");
+  showFilePreview(file.name, "image", true);
 
   try {
-    if (isText) {
-      // Read as text directly
-      const text = await file.text();
-      pendingFile = {
-        fileContext: `File: ${file.name}\n\nContent:\n${text.slice(0, 8000)}`,
-        fileName: file.name,
-        fileType: "text"
-      };
-    } else if (isImage || isPDF) {
-      // Convert to base64 and send to vision API
-      const base64 = await toBase64(file);
-      showFilePreview(file.name, isImage ? "image" : "pdf", true); // loading state
+    const base64 = await toBase64(file);
 
-      const res = await fetch("/api/vision", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ base64, mimeType: file.type, fileName: file.name })
-      });
-      const data = await res.json();
+    const res = await fetch("/api/vision", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ base64, mimeType: file.type, fileName: file.name })
+    });
+    const data = await res.json();
 
-      if (data.error) {
-        clearPendingFile();
-        alert("Could not read file: " + data.error);
-        return;
-      }
-
-      pendingFile = {
-        fileContext: data.fileContext,
-        fileName: file.name,
-        fileType: isImage ? "image" : "pdf"
-      };
-      showFilePreview(file.name, isImage ? "image" : "pdf", false);
-    } else {
-      alert("Unsupported file type. Please upload an image, PDF, or text file.");
+    if (data.error) {
+      clearPendingFile();
+      alert("Could not read image: " + data.error);
+      return;
     }
+
+    pendingFile = {
+      fileContext: data.fileContext,
+      fileName: file.name,
+      fileType: "image"
+    };
+    showFilePreview(file.name, "image", false);
     updateSendBtn();
   } catch (err) {
     clearPendingFile();
-    alert("Error reading file. Please try again.");
+    alert("Error reading image. Please try again.");
   }
 }
 
@@ -1129,7 +1117,7 @@ async function generateImage(prompt, chatId) {
     // Save
     const c = chats.find(x => x.id === chatId);
     if (c) {
-      c.messages.push({ role: "assistant", content: `[image:${imageUrl}:${prompt}]` });
+      c.messages.push({ role: "assistant", content: `[image:${imageUrl}:${prompt}]`, ts: new Date().toISOString() });
       saveChats();
     }
   } else {
@@ -1164,22 +1152,7 @@ async function showCodeResult(data, chatId, userText) {
   wrap.className = "msg-content";
   wrap.style.maxWidth = "calc(100% - 44px)";
 
-  // Collapsible thinking panel
-  const panel = document.createElement("div");
-  panel.className = "thinking-panel";
-  panel.innerHTML = `
-    <div class="thinking-panel-header" onclick="toggleThinkingPanel(this.parentElement)">
-      <div class="thinking-panel-left">
-        <div class="thinking-dot done"></div>
-        <span>Worked on: <strong>${escHtml(task || language + " code")}</strong></span>
-      </div>
-      <span class="thinking-chevron">▼</span>
-    </div>
-    <div class="thinking-panel-body">
-      <pre>Writing ${escHtml(language)} code for: ${escHtml(task || userText)}\nFilename: ${escHtml(filename || "code." + language)}\nLines: ${code.split('\n').length}</pre>
-    </div>`;
-
-  // Code result card
+  // Code result card — no collapsible panel, show directly
   const card = document.createElement("div");
   card.className = "code-result-card";
 
@@ -1208,11 +1181,11 @@ async function showCodeResult(data, chatId, userText) {
   card.appendChild(header);
   card.appendChild(pre);
 
+  const ts = new Date().toISOString();
   const time = document.createElement("span");
   time.className = "msg-time";
   time.textContent = getTime();
 
-  wrap.appendChild(panel);
   wrap.appendChild(card);
   wrap.appendChild(time);
   row.appendChild(avatar);
@@ -1220,10 +1193,10 @@ async function showCodeResult(data, chatId, userText) {
   messagesEl.appendChild(row);
   scrollToBottom();
 
-  // Save to chat history
+  // Save to chat history with timestamp
   const c = chats.find(x => x.id === chatId);
   if (c) {
-    c.messages.push({ role: "assistant", content: "```" + language + "\n" + code + "\n```" });
+    c.messages.push({ role: "assistant", content: "```" + language + "\n" + code + "\n```", ts });
     saveChats();
   }
 }
