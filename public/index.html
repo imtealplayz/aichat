@@ -1,58 +1,107 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+  <!-- Supabase keys (read by auth.js) -->
+  <meta name="sb-url"  content="https://ymmiakachpicmoqktjrd.supabase.co" />
+  <meta name="sb-anon" content="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bWlha2FjaHBpY21vcWt0anJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NjY1MDUsImV4cCI6MjA5MTQ0MjUwNX0.0HK5ttCXoTs1RdyeJqs8jk641WpOPgKoklW_M4bROdU" />
+
   <!-- Primary SEO -->
   <title>BouAI — Free AI Chatbot | Chat, Generate Images & Code</title>
-  <meta name="description" content="BouAI is a free AI assistant you can use right now — no sign-up needed. Chat with AI, generate images, get coding help, and more. Powered by advanced AI APIs." />
-  <meta name="keywords" content="Bou AI, BouAI, free AI chatbot, AI assistant, online AI tool, free AI chat, AI image generator, AI coding assistant, chat with AI" />
+  <meta name="description" content="BouAI is a free AI assistant — chat with AI, generate images, get coding help. No sign-up needed. Powered by advanced AI APIs." />
+  <meta name="keywords" content="Bou AI, BouAI, free AI chatbot, AI assistant, online AI tool, free AI chat, AI image generator, AI coding assistant" />
   <meta name="author" content="Teal" />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="https://bouai.vercel.app/" />
-
-  <!-- Open Graph (Discord, Facebook, WhatsApp previews) -->
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://bouai.vercel.app/" />
-  <meta property="og:title" content="BouAI — Free AI Chatbot | Chat, Images & Code" />
-  <meta property="og:description" content="Chat with Bou for free — no sign-up needed. AI chat, image generation, coding help, and more. Your data stays on your device." />
+  <meta property="og:title" content="BouAI — Free AI Chatbot" />
+  <meta property="og:description" content="Free AI chat, image generation, coding help. No sign-up needed." />
   <meta property="og:image" content="https://bouai.vercel.app/images/bou-avatar.png" />
-  <meta property="og:site_name" content="BouAI" />
-  <meta property="og:locale" content="en_US" />
-
-  <!-- Twitter / X card -->
   <meta name="twitter:card" content="summary" />
   <meta name="twitter:title" content="BouAI — Free AI Chatbot" />
-  <meta name="twitter:description" content="Free AI assistant — chat, generate images, get coding help. No sign-up needed." />
-  <meta name="twitter:image" content="https://bouai.vercel.app/images/bou-avatar.png" />
-
-  <!-- Structured data (Google rich results) -->
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "WebApplication",
-    "name": "BouAI",
-    "alternateName": ["Bou", "Bou AI"],
-    "url": "https://bouai.vercel.app/",
-    "description": "BouAI is a free AI chatbot and assistant. Chat with AI, generate images, and get coding help — no sign-up required.",
-    "applicationCategory": "UtilitiesApplication",
-    "operatingSystem": "Web",
-    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-    "author": { "@type": "Person", "name": "Teal" },
-    "featureList": ["AI Chat", "Image Generation", "Coding Help", "File Analysis", "No Sign-up Required"]
-  }
-  </script>
+  <meta name="twitter:description" content="Free AI assistant — chat, images, code." />
 
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
+
+  <!-- Supabase JS SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
 
-  <!-- Image zoom modal -->
+  <!-- AUTH MODAL -->
+  <div class="auth-overlay" id="authOverlay">
+    <div class="auth-modal" id="authModal">
+      <div class="auth-header">
+        <div class="auth-logo">
+          <div class="brand-avatar"><img src="/images/bou-avatar.png" alt="BouAI" /></div>
+          <span>BouAI</span>
+        </div>
+        <button class="auth-close" onclick="closeAuthModal()" title="Close">✕</button>
+      </div>
+
+      <!-- Tab switcher -->
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tabSignin" onclick="switchAuthTab('signin')">Sign in</button>
+        <button class="auth-tab" id="tabSignup" onclick="switchAuthTab('signup')">Sign up</button>
+      </div>
+
+      <!-- Google button -->
+      <button class="auth-google-btn" onclick="handleGoogleAuth()">
+        <svg viewBox="0 0 24 24" width="18" height="18">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+        </svg>
+        Continue with Google
+      </button>
+
+      <div class="auth-divider"><span>or</span></div>
+
+      <!-- Sign in form -->
+      <div id="formSignin">
+        <div class="auth-field">
+          <label>Email</label>
+          <input type="email" id="signinEmail" placeholder="you@example.com" autocomplete="email" />
+        </div>
+        <div class="auth-field">
+          <label>Password</label>
+          <input type="password" id="signinPassword" placeholder="••••••••" autocomplete="current-password" />
+        </div>
+        <p class="auth-error" id="signinError"></p>
+        <button class="auth-submit-btn" onclick="handleEmailSignin()">Sign in</button>
+      </div>
+
+      <!-- Sign up form -->
+      <div id="formSignup" style="display:none">
+        <div class="auth-field">
+          <label>Display name</label>
+          <input type="text" id="signupName" placeholder="Your name" autocomplete="name" />
+        </div>
+        <div class="auth-field">
+          <label>Email</label>
+          <input type="email" id="signupEmail" placeholder="you@example.com" autocomplete="email" />
+        </div>
+        <div class="auth-field">
+          <label>Password</label>
+          <input type="password" id="signupPassword" placeholder="At least 6 characters" autocomplete="new-password" />
+        </div>
+        <p class="auth-error" id="signupError"></p>
+        <button class="auth-submit-btn" onclick="handleEmailSignup()">Create account</button>
+      </div>
+
+      <p class="auth-note">By continuing you agree that BouAI stores no personal data beyond what's needed to sync your chats.</p>
+    </div>
+  </div>
+
+  <!-- IMAGE ZOOM MODAL -->
   <div class="zoom-modal" id="zoomModal" onclick="closeZoom()">
     <button class="zoom-close" onclick="closeZoom()">✕</button>
     <img id="zoomImg" src="" alt="Zoomed image" onclick="event.stopPropagation()" />
@@ -62,9 +111,15 @@
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-top">
       <div class="sidebar-brand">
-        <div class="brand-avatar"><img src="/images/bou-avatar.png" alt="BouAI logo" /></div>
+        <div class="brand-avatar"><img src="/images/bou-avatar.png" alt="BouAI" /></div>
         <span class="brand-name">BouAI</span>
+        <!-- Theme toggle -->
+        <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">
+          <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
       </div>
+
       <button class="new-chat-btn" onclick="newChat()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
         New Chat
@@ -72,19 +127,24 @@
       <p class="history-label">Recents</p>
       <div class="chat-history" id="chatHistory"></div>
     </div>
+
     <div class="sidebar-bottom">
+      <!-- User section -->
+      <div class="user-section" id="userSection">
+        <!-- Filled by JS -->
+      </div>
       <nav class="sidebar-nav">
-        <a href="#" class="nav-item" data-page="about" onclick="navigate('about'); return false;">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-          About
+        <a href="#" class="nav-item" data-page="about"  onclick="navigate('about');  return false;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>About
         </a>
         <a href="#" class="nav-item" data-page="images" onclick="navigate('images'); return false;">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-          Images
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Images
         </a>
-        <a href="#" class="nav-item" data-page="info" onclick="navigate('info'); return false;">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 8v4M12 16h.01"/></svg>
-          Info
+        <a href="#" class="nav-item" data-page="memory" onclick="navigate('memory'); return false;" id="memoryNavItem">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 2a9 9 0 0 1 9 9c0 3.87-2.44 7.17-6 8.48V21H9v-1.52C5.44 18.17 3 14.87 3 11a9 9 0 0 1 9-9z"/><path d="M9 21h6"/></svg>Memory
+        </a>
+        <a href="#" class="nav-item" data-page="info"   onclick="navigate('info');   return false;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 8v4M12 16h.01"/></svg>Info
         </a>
       </nav>
       <div class="sidebar-powered">
@@ -129,18 +189,19 @@
     <p class="history-label">Recents</p>
     <div class="chat-history" id="chatHistoryMobile"></div>
     <div class="drawer-footer">
+      <div class="user-section" id="userSectionMobile"></div>
       <nav class="sidebar-nav">
-        <a href="#" class="nav-item" data-page="about" onclick="navigate('about'); return false;">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-          About
+        <a href="#" class="nav-item" data-page="about"  onclick="navigate('about');  closeMobileMenu(); return false;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>About
         </a>
-        <a href="#" class="nav-item" data-page="images" onclick="navigate('images'); return false;">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-          Images
+        <a href="#" class="nav-item" data-page="images" onclick="navigate('images'); closeMobileMenu(); return false;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Images
         </a>
-        <a href="#" class="nav-item" data-page="info" onclick="navigate('info'); return false;">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 8v4M12 16h.01"/></svg>
-          Info
+        <a href="#" class="nav-item" data-page="memory" onclick="navigate('memory'); closeMobileMenu(); return false;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 2a9 9 0 0 1 9 9c0 3.87-2.44 7.17-6 8.48V21H9v-1.52C5.44 18.17 3 14.87 3 11a9 9 0 0 1 9-9z"/><path d="M9 21h6"/></svg>Memory
+        </a>
+        <a href="#" class="nav-item" data-page="info"   onclick="navigate('info');   closeMobileMenu(); return false;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 8v4M12 16h.01"/></svg>Info
         </a>
       </nav>
     </div>
@@ -152,27 +213,21 @@
     <!-- CHAT PAGE -->
     <div class="page active" id="page-chat">
       <div class="chat-layout">
-
-        <!-- File preview bar (hidden until file selected) -->
         <div class="file-preview-bar" id="filePreviewBar" style="display:none">
           <div class="file-preview-inner">
             <div class="file-preview-info" id="filePreviewInfo"></div>
-            <button class="file-preview-remove" onclick="clearPendingFile()" title="Remove file">✕</button>
+            <button class="file-preview-remove" onclick="clearPendingFile()" title="Remove">✕</button>
           </div>
         </div>
-
         <div class="messages-wrap" id="messages">
-          <!-- SEO-friendly hidden content for crawlers -->
           <div class="seo-content" aria-hidden="true" style="display:none">
-            <h1>BouAI — Free AI Chatbot and Assistant</h1>
+            <h1>BouAI — Free AI Chatbot</h1>
             <h2>Chat with AI, generate images, and get coding help for free</h2>
-            <p>BouAI is a free online AI tool. Use it as an AI chatbot, an AI image generator, or a coding assistant. No sign-up required. Your data stays on your device.</p>
           </div>
-
           <div class="welcome-state" id="welcomeState">
-            <div class="welcome-avatar"><img src="/images/bou-avatar.png" alt="BouAI assistant" /></div>
+            <div class="welcome-avatar"><img src="/images/bou-avatar.png" alt="BouAI" /></div>
             <h2>How can I help you?</h2>
-            <p>Free AI chat, image generation, coding help and more — no sign-up needed.</p>
+            <p>Free AI chat, image generation, coding help — no sign-up needed.</p>
             <div class="chips">
               <button class="chip" onclick="fillSuggestion(this)">How does machine learning work?</button>
               <button class="chip" onclick="fillSuggestion(this)">Write a Python hello world</button>
@@ -181,23 +236,16 @@
             </div>
           </div>
         </div>
-
         <div class="input-wrap">
           <div class="input-shell" id="inputBox">
-            <!-- Hidden file input -->
             <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none" onchange="handleFileSelect(this)" />
-            <!-- Upload button -->
-            <button class="upload-btn" onclick="document.getElementById('fileInput').click()" title="Upload file or image">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
-              </svg>
+            <button class="upload-btn" id="uploadBtn" onclick="handleUploadClick()" title="Upload image (sign in required)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
             </button>
             <textarea id="userInput" placeholder="Message BouAI…" rows="1"
               onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
             <button class="action-btn send" id="sendBtn" onclick="sendMessage()" disabled title="Send">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
-              </svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
             </button>
             <button class="action-btn stop" id="stopBtn" onclick="stopResponse()" style="display:none" title="Stop">
               <svg viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2.5"/></svg>
@@ -214,39 +262,39 @@
         <div class="page-hero">
           <div class="hero-avatar"><img src="/images/bou-avatar.png" alt="BouAI" /></div>
           <h1>Meet <em>BouAI</em></h1>
-          <p>A free AI assistant for chat, image generation, and coding help — no account required.</p>
+          <p>A free AI assistant for chat, image generation, and coding help.</p>
         </div>
         <div class="card-grid">
           <div class="card">
             <div class="card-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
             <h3>Free AI chat</h3>
-            <p>Ask anything — questions, explanations, advice. BouAI responds clearly and concisely, like a knowledgeable colleague.</p>
+            <p>Ask anything — questions, explanations, advice. No sign-up needed.</p>
           </div>
           <div class="card">
             <div class="card-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>
             <h3>Image generation</h3>
-            <p>Just say "generate an image of…" — BouAI creates it automatically. Download or zoom into any generated image.</p>
+            <p>Say "generate an image of…" — BouAI creates it. Download, zoom, or regenerate.</p>
           </div>
           <div class="card">
             <div class="card-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></div>
             <h3>Coding help</h3>
-            <p>Ask BouAI to write code in any language. Download the result as a file directly from the chat.</p>
+            <p>Ask BouAI to write code in any language. Download the result as a file.</p>
           </div>
         </div>
         <div class="notice-box">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="15" height="15" style="flex-shrink:0;margin-top:2px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
           <div>
             <strong>Powered by AI (via API integration)</strong>
-            <p>BouAI is not a proprietary AI. It uses third-party AI APIs (Groq, Gemini) to generate responses. It is free to use and your conversations are never stored on our servers.</p>
+            <p>BouAI uses third-party AI APIs (Groq, Gemini). It is free to use and your conversations are never stored on our servers unless you sign in for sync.</p>
           </div>
         </div>
         <div class="creator-row">
-          <img src="/images/teal-avatar.jpg" alt="Teal, creator of BouAI" class="creator-img" />
+          <img src="/images/teal-avatar.jpg" alt="Teal" class="creator-img" />
           <div class="creator-text">
             <span class="creator-label">Created by</span>
             <span class="creator-name">Teal</span>
             <a href="https://discord.com/users/tealgaveup" target="_blank" rel="noopener" class="creator-link">
-              <svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.032.055a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
+              <svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.032.055a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
               @tealgaveup
             </a>
           </div>
@@ -261,34 +309,49 @@
         <div class="page-hero">
           <div class="hero-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" width="28" height="28"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>
           <h1>Image <em>Generation</em></h1>
-          <p>How BouAI generates and saves images — and what you need to know.</p>
+          <p>How BouAI generates images and what you should know.</p>
         </div>
         <div class="notice-box warn-box">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="16" height="16" style="flex-shrink:0;margin-top:2px;color:#fbbf24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           <div>
             <strong style="color:#fbbf24">Images are saved as URLs — not files</strong>
-            <p>Generated images are stored as links to Pollinations.AI's servers. Download any image you want to keep permanently using the Download button.</p>
+            <p>Generated images are stored as links to Pollinations.AI. Download any image you want to keep permanently.</p>
           </div>
         </div>
         <div class="info-list">
           <div class="info-item">
             <div class="info-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
-            <div><h3>How to generate an image</h3><p>Say "generate an image of a forest at night" or "draw a futuristic city". BouAI detects your intent and generates automatically. If unclear, it will ask first.</p></div>
+            <div><h3>How to generate</h3><p>Say "generate an image of a forest at night" or "draw a futuristic city". BouAI detects your intent automatically.</p></div>
           </div>
           <div class="info-item">
             <div class="info-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
-            <div><h3>Powered by Pollinations.AI</h3><p>Free image generation, no key needed. Takes <strong>3–8 seconds</strong> per image. Click an image to zoom in. Use the Regenerate button for a new version.</p></div>
+            <div><h3>Powered by Pollinations.AI</h3><p>Free image generation, no key needed. Takes 3–8 seconds. Click any image to zoom. Use Regenerate for a new version.</p></div>
           </div>
           <div class="info-item">
             <div class="info-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
-            <div><h3>Downloading images</h3><p>Every image has a Download button that saves it directly to your device as a PNG — no new tab required.</p></div>
+            <div><h3>Downloading</h3><p>Every image has a Download button that saves directly to your device as PNG — no new tab.</p></div>
           </div>
           <div class="info-item">
             <div class="info-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
-            <div><h3>What BouAI won't generate</h3><p>Requests involving violence, nudity, real identifiable people, or offensive content will be refused.</p></div>
+            <div><h3>What BouAI won't generate</h3><p>Violence, nudity, real identifiable people, or offensive content will be refused.</p></div>
           </div>
         </div>
         <div class="page-cta"><button onclick="navigate('chat')">Start chatting →</button></div>
+      </div>
+    </div>
+
+    <!-- MEMORY PAGE -->
+    <div class="page" id="page-memory">
+      <div class="content-page">
+        <div class="page-hero">
+          <div class="hero-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" width="28" height="28"><path d="M12 2a9 9 0 0 1 9 9c0 3.87-2.44 7.17-6 8.48V21H9v-1.52C5.44 18.17 3 14.87 3 11a9 9 0 0 1 9-9z"/><path d="M9 21h6"/></svg></div>
+          <h1>What <em>BouAI</em> knows about you</h1>
+          <p>Review, edit, or delete anything BouAI has learned from your conversations.</p>
+        </div>
+        <div id="memoryPageContent">
+          <!-- Filled by JS -->
+        </div>
+        <div class="page-cta"><button onclick="navigate('chat')">Back to chat →</button></div>
       </div>
     </div>
 
@@ -298,32 +361,24 @@
         <div class="page-hero">
           <div class="hero-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" width="26" height="26"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 8v4M12 16h.01"/></svg></div>
           <h1>How <em>BouAI</em> works</h1>
-          <p>Privacy, data storage, and how everything fits together.</p>
+          <p>Privacy, data storage, and feature details.</p>
         </div>
         <div class="info-list">
           <div class="info-item">
             <div class="info-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
-            <div><h3>Stored on your device only</h3><p>BouAI uses <strong>localStorage</strong>. Conversations never leave your device and are not sent anywhere for storage.</p></div>
+            <div><h3>Guest mode</h3><p>Without an account, chats are saved on your device only (up to 5). Memory is local. Image upload is not available.</p></div>
           </div>
           <div class="info-item">
-            <div class="info-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
-            <div><h3>Chat history limit</h3><p>BouAI keeps a maximum of <strong>5 chats</strong>. When you start a 6th, the oldest is removed. Each chat is named by AI based on your first message.</p></div>
+            <div class="info-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+            <div><h3>Signed in</h3><p>With an account: up to 10 chats synced across devices, memory synced to cloud, image upload enabled, better memory recall.</p></div>
           </div>
           <div class="info-item">
             <div class="info-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
-            <div><h3>What we don't collect</h3><p>No name, email, IP, or personal info is ever collected. Messages are sent to AI APIs only to generate responses — not stored or logged by us.</p></div>
-          </div>
-          <div class="info-item" id="memoryInfoItem">
-            <div class="info-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 2a9 9 0 0 1 9 9c0 3.87-2.44 7.17-6 8.48V21H9v-1.52C5.44 18.17 3 14.87 3 11a9 9 0 0 1 9-9z"/><path d="M9 21h6"/></svg></div>
-            <div>
-              <h3>Memory</h3>
-              <p id="memorySummaryText">Loading memory...</p>
-              <button onclick="handleClearMemory()" class="clear-memory-btn" style="margin-top:10px">Clear all memory</button>
-            </div>
+            <div><h3>What we collect</h3><p>Only your email (for auth) and your chat/memory data — stored in Supabase. We never sell or share your data.</p></div>
           </div>
           <div class="info-item">
             <div class="info-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg></div>
-            <div><h3>How to clear chats</h3><p>Click <strong>✕</strong> next to any chat in the sidebar. To clear everything, clear site data for this site in your browser settings.</p></div>
+            <div><h3>Deleting your data</h3><p>Delete individual chats with ✕ in the sidebar. Clear all memory from the Memory page. Contact Teal on Discord to delete your account.</p></div>
           </div>
         </div>
         <div class="page-cta"><button onclick="navigate('chat')">Back to chat →</button></div>
@@ -331,7 +386,9 @@
     </div>
 
   </main>
+
   <script src="memory.js"></script>
+  <script src="auth.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
