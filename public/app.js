@@ -1,9 +1,13 @@
 // ===========================
 // CONSTANTS
 // ===========================
-const MAX_CHATS = 5;
+const MAX_CHATS_GUEST = 5;
+const MAX_CHATS_USER  = 10;
 const STORAGE_KEY = "bou_chats";
 const ACTIVE_KEY  = "bou_active_chat";
+const THEME_KEY   = "bou_theme";
+
+function getMaxChats() { return isLoggedIn() ? MAX_CHATS_USER : MAX_CHATS_GUEST; }
 
 // ===========================
 // STATE
@@ -116,8 +120,8 @@ function newChat() {
   chats.unshift(chat);
 
   // Trim to max 5
-  if (chats.length > MAX_CHATS) {
-    chats = chats.slice(0, MAX_CHATS);
+  if (chats.length > getMaxChats()) {
+    chats = chats.slice(0, getMaxChats());
   }
 
   activeChatId = chat.id;
@@ -805,49 +809,9 @@ function copyCode(btn) {
 // ===========================
 // INIT
 // ===========================
-window.addEventListener("load", () => {
-  loadChats();
 
-  // If no chats at all, create a fresh one
-  if (chats.length === 0) {
-    const fresh = { id: generateId(), name: "New Chat", messages: [] };
-    chats.push(fresh);
-    activeChatId = fresh.id;
-    saveChats();
-  } else {
-    // Make sure activeChatId is valid
-    if (!chats.find(c => c.id === activeChatId)) {
-      activeChatId = chats[0].id;
-    }
-  }
 
-  renderChatHistory();
-  renderMessages();
 
-  inputEl.addEventListener("input", updateSendBtn);
-  inputEl.focus();
-
-  // Refresh memory summary whenever Info page is shown
-  document.querySelectorAll('.nav-item[data-page="info"]').forEach(el => {
-    el.addEventListener("click", refreshMemoryDisplay);
-  });
-});
-
-// ===========================
-// MEMORY UI
-// ===========================
-function refreshMemoryDisplay() {
-  const el = document.getElementById("memorySummaryText");
-  if (!el) return;
-  const summary = getMemorySummary();
-  el.textContent = summary.join("\n");
-}
-
-function handleClearMemory() {
-  if (!confirm("Clear all of Bou\'s memory about you? This cannot be undone.")) return;
-  clearMemory();
-  refreshMemoryDisplay();
-}
 
 // ===========================
 // FILE UPLOAD
@@ -1310,3 +1274,389 @@ function renderImageMessage(imageUrl, prompt) {
   row.appendChild(wrap);
   messagesEl.appendChild(row);
 }
+
+// ═══════════════════════════════════════════
+// THEME TOGGLE
+// ═══════════════════════════════════════════
+function initTheme() {
+  const saved = localStorage.getItem(THEME_KEY) || "dark";
+  applyTheme(saved);
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  localStorage.setItem(THEME_KEY, theme);
+  const sunIcon  = document.querySelector(".icon-sun");
+  const moonIcon = document.querySelector(".icon-moon");
+  if (sunIcon && moonIcon) {
+    sunIcon.style.display  = theme === "dark"  ? "block" : "none";
+    moonIcon.style.display = theme === "light" ? "block" : "none";
+  }
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute("data-theme") || "dark";
+  applyTheme(current === "dark" ? "light" : "dark");
+}
+
+// ═══════════════════════════════════════════
+// AUTH UI
+// ═══════════════════════════════════════════
+function openAuthModal() {
+  document.getElementById("authOverlay").classList.add("open");
+}
+
+function closeAuthModal() {
+  document.getElementById("authOverlay").classList.remove("open");
+}
+
+function switchAuthTab(tab) {
+  document.getElementById("tabSignin").classList.toggle("active", tab === "signin");
+  document.getElementById("tabSignup").classList.toggle("active", tab === "signup");
+  document.getElementById("formSignin").style.display = tab === "signin" ? "block" : "none";
+  document.getElementById("formSignup").style.display = tab === "signup" ? "block" : "none";
+  document.getElementById("signinError").textContent = "";
+  document.getElementById("signupError").textContent = "";
+}
+
+async function handleGoogleAuth() {
+  const { error } = await signInWithGoogle();
+  if (error) showAuthError("signinError", error.message || "Google sign in failed.");
+}
+
+async function handleEmailSignin() {
+  const email    = document.getElementById("signinEmail").value.trim();
+  const password = document.getElementById("signinPassword").value;
+  if (!email || !password) return showAuthError("signinError", "Please fill in all fields.");
+  const btn = document.querySelector("#formSignin .auth-submit-btn");
+  btn.disabled = true; btn.textContent = "Signing in…";
+  const { error } = await signInWithEmail(email, password);
+  btn.disabled = false; btn.textContent = "Sign in";
+  if (error) showAuthError("signinError", error.message || "Sign in failed.");
+  else closeAuthModal();
+}
+
+async function handleEmailSignup() {
+  const name     = document.getElementById("signupName").value.trim();
+  const email    = document.getElementById("signupEmail").value.trim();
+  const password = document.getElementById("signupPassword").value;
+  if (!email || !password) return showAuthError("signupError", "Please fill in email and password.");
+  if (password.length < 6)  return showAuthError("signupError", "Password must be at least 6 characters.");
+  const btn = document.querySelector("#formSignup .auth-submit-btn");
+  btn.disabled = true; btn.textContent = "Creating account…";
+  const { error } = await signUpWithEmail(email, password, name);
+  btn.disabled = false; btn.textContent = "Create account";
+  if (error) showAuthError("signupError", error.message || "Sign up failed.");
+  else {
+    closeAuthModal();
+    showToast("Check your email to confirm your account!");
+  }
+}
+
+function showAuthError(id, msg) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = msg;
+}
+
+// ═══════════════════════════════════════════
+// USER SECTION RENDER
+// ═══════════════════════════════════════════
+function renderUserSection() {
+  const containers = [
+    document.getElementById("userSection"),
+    document.getElementById("userSectionMobile")
+  ];
+
+  containers.forEach(el => {
+    if (!el) return;
+    if (isLoggedIn()) {
+      const name   = getUserDisplayName();
+      const avatar = getUserAvatar();
+      const initials = name.slice(0, 2).toUpperCase();
+      el.innerHTML = `
+        <div class="user-card">
+          ${avatar
+            ? `<img src="${avatar}" class="user-avatar-img" alt="${name}" referrerpolicy="no-referrer" />`
+            : `<div class="user-avatar-initials">${initials}</div>`}
+          <div class="user-info">
+            <span class="user-name">${escHtml(name)}</span>
+            <span class="user-badge">✦ Signed in</span>
+          </div>
+          <button class="user-signout-btn" onclick="handleSignOut()" title="Sign out">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+          </button>
+        </div>`;
+    } else {
+      el.innerHTML = `
+        <button class="signin-prompt-btn" onclick="openAuthModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+            <polyline points="10 17 15 12 10 7"/>
+            <line x1="15" y1="12" x2="3" y2="12"/>
+          </svg>
+          Sign in for more features
+        </button>`;
+    }
+  });
+
+  // Upload button gating
+  const uploadBtn = document.getElementById("uploadBtn");
+  if (uploadBtn) {
+    uploadBtn.classList.toggle("gated", !isLoggedIn());
+    uploadBtn.title = isLoggedIn() ? "Upload image" : "Sign in to upload images";
+  }
+}
+
+async function handleSignOut() {
+  await signOut();
+  // Switch to localStorage
+  loadChats();
+  renderChatHistory();
+  renderMessages();
+  renderUserSection();
+  showToast("Signed out successfully.");
+}
+
+// ═══════════════════════════════════════════
+// UPLOAD GATE
+// ═══════════════════════════════════════════
+function handleUploadClick() {
+  if (!isLoggedIn()) {
+    showToast("Sign in to upload images.");
+    openAuthModal();
+    return;
+  }
+  document.getElementById("fileInput").click();
+}
+
+// ═══════════════════════════════════════════
+// TOAST NOTIFICATION
+// ═══════════════════════════════════════════
+let toastTimeout = null;
+function showToast(msg) {
+  let toast = document.getElementById("featureToast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "featureToast";
+    toast.className = "feature-toast";
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.classList.add("show");
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => toast.classList.remove("show"), 3000);
+}
+
+// ═══════════════════════════════════════════
+// CLOUD SYNC — save chats debounced
+// ═══════════════════════════════════════════
+let syncTimeout = null;
+function debouncedCloudSync() {
+  if (!isLoggedIn()) return;
+  clearTimeout(syncTimeout);
+  syncTimeout = setTimeout(async () => {
+    await saveChatsToCloud(chats);
+    const mem = loadMemory();
+    await saveMemoryToCloud(mem);
+  }, 2000);
+}
+
+// Override saveChats to also sync cloud
+const _origSaveChats = typeof saveChats === "function" ? saveChats : null;
+function saveChats() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(chats));
+  localStorage.setItem(ACTIVE_KEY, activeChatId || "");
+  debouncedCloudSync();
+}
+
+// ═══════════════════════════════════════════
+// MEMORY PAGE
+// ═══════════════════════════════════════════
+function renderMemoryPage() {
+  const container = document.getElementById("memoryPageContent");
+  if (!container) return;
+
+  const memory = loadMemory();
+  const sections = [];
+
+  if (!isLoggedIn()) {
+    container.innerHTML = `
+      <div class="memory-login-prompt">
+        <p>Sign in to sync your memory across devices and get better recall.</p>
+        <button onclick="openAuthModal()">Sign in</button>
+      </div>
+      <div style="margin-top:16px"></div>`;
+    // Still show local memory below
+  }
+
+  // Helper to build a section
+  function makeSection(title, items, field) {
+    if (!items || items.length === 0) return "";
+    const cards = items.map((item, i) => `
+      <div class="memory-card" id="memcard-${field}-${i}">
+        <div>
+          <div class="memory-card-label">${title}</div>
+          <div class="memory-card-text">${escHtml(String(item))}</div>
+        </div>
+        <button class="memory-del-btn" onclick="deleteMemoryItem('${field}', ${i})" title="Delete">✕</button>
+      </div>`).join("");
+    return `<div class="memory-section">
+      <div class="memory-section-title">${title}</div>
+      ${cards}
+    </div>`;
+  }
+
+  let html = "";
+  let hasAny = false;
+
+  if (memory.userName) {
+    hasAny = true;
+    html += `<div class="memory-section">
+      <div class="memory-section-title">Name</div>
+      <div class="memory-card">
+        <div>
+          <div class="memory-card-label">Your name</div>
+          <div class="memory-card-text">${escHtml(memory.userName)}</div>
+        </div>
+        <button class="memory-del-btn" onclick="deleteMemoryField('userName')" title="Delete">✕</button>
+      </div>
+    </div>`;
+  }
+
+  if (memory.tone) {
+    hasAny = true;
+    html += `<div class="memory-section">
+      <div class="memory-section-title">Tone preference</div>
+      <div class="memory-card">
+        <div>
+          <div class="memory-card-label">Preferred tone</div>
+          <div class="memory-card-text">${escHtml(memory.tone)}</div>
+        </div>
+        <button class="memory-del-btn" onclick="deleteMemoryField('tone')" title="Delete">✕</button>
+      </div>
+    </div>`;
+  }
+
+  if (memory.preferences?.length > 0) {
+    hasAny = true;
+    html += makeSection("Preferences", memory.preferences, "preferences");
+  }
+  if (memory.facts?.length > 0) {
+    hasAny = true;
+    html += makeSection("Facts", memory.facts, "facts");
+  }
+  if (memory.topics?.length > 0) {
+    hasAny = true;
+    html += makeSection("Topics", memory.topics, "topics");
+  }
+
+  if (!hasAny) {
+    html = `<p class="memory-empty">No memory stored yet. As you chat with BouAI, it will remember things about you here.</p>`;
+  } else {
+    html = `<div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+      <button class="memory-clear-all-btn" onclick="clearAllMemory()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+        Clear all memory
+      </button>
+    </div>` + html;
+  }
+
+  if (!isLoggedIn()) {
+    container.innerHTML = container.innerHTML + html;
+  } else {
+    container.innerHTML = html;
+  }
+}
+
+function deleteMemoryItem(field, index) {
+  const memory = loadMemory();
+  if (Array.isArray(memory[field])) {
+    memory[field].splice(index, 1);
+    saveMemory(memory);
+    if (isLoggedIn()) saveMemoryToCloud(memory);
+    renderMemoryPage();
+  }
+}
+
+function deleteMemoryField(field) {
+  const memory = loadMemory();
+  memory[field] = field === "preferences" || field === "facts" || field === "topics" ? [] : null;
+  saveMemory(memory);
+  if (isLoggedIn()) saveMemoryToCloud(memory);
+  renderMemoryPage();
+}
+
+function clearAllMemory() {
+  if (!confirm("Clear all of BouAI's memory about you? This cannot be undone.")) return;
+  clearMemory();
+  if (isLoggedIn()) saveMemoryToCloud(loadMemory());
+  renderMemoryPage();
+}
+
+// ═══════════════════════════════════════════
+// OVERRIDE navigate() TO REFRESH MEMORY PAGE
+// ═══════════════════════════════════════════
+const _origNavigate = navigate;
+function navigate(name) {
+  showPage(name);
+  closeMobileMenu();
+  if (name === "memory") renderMemoryPage();
+}
+
+// ═══════════════════════════════════════════
+// INIT WITH AUTH
+// ═══════════════════════════════════════════
+window.addEventListener("load", async () => {
+  initTheme();
+
+  // Load session
+  await getSession();
+
+  // Listen for auth changes (e.g. after Google redirect)
+  onAuthChange(async (event, session) => {
+    if (event === "SIGNED_IN" && session) {
+      // Load cloud chats
+      showToast("Signed in! Loading your chats…");
+      const cloudChats = await loadChatsFromCloud();
+      if (cloudChats && cloudChats.length > 0) {
+        chats = cloudChats;
+        activeChatId = chats[0].id;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(chats));
+        localStorage.setItem(ACTIVE_KEY, activeChatId);
+      }
+      // Load cloud memory
+      const cloudMem = await loadMemoryFromCloud();
+      if (cloudMem) {
+        localStorage.setItem("bou_memory", JSON.stringify(cloudMem));
+      }
+      renderChatHistory();
+      renderMessages();
+      renderUserSection();
+      closeAuthModal();
+    } else if (event === "SIGNED_OUT") {
+      renderUserSection();
+    }
+  });
+
+  // Load chats
+  loadChats();
+  if (chats.length === 0) {
+    const fresh = { id: generateId(), name: "New Chat", messages: [] };
+    chats.push(fresh);
+    activeChatId = fresh.id;
+    saveChats();
+  } else {
+    if (!chats.find(c => c.id === activeChatId)) activeChatId = chats[0].id;
+  }
+
+  renderChatHistory();
+  renderMessages();
+  renderUserSection();
+
+  inputEl.addEventListener("input", updateSendBtn);
+  inputEl.focus();
+});
