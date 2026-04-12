@@ -233,16 +233,19 @@ function renderMessages() {
     welcome.className = "welcome-state";
     welcome.id = "welcomeState";
     welcome.innerHTML = `
-      <div class="welcome-avatar"><img src="/images/bou-avatar.png" alt="Bou" /></div>
+      <div class="welcome-avatar"><img src="/images/bou-avatar.png" alt="BouAI" /></div>
       <h2>How can I help you today?</h2>
-      <p>Ask me anything — questions, explanations, code, and more.</p>
-      <div class="suggestions">
-        <button class="suggestion-chip" onclick="fillSuggestion(this)">Explain how machine learning works</button>
-        <button class="suggestion-chip" onclick="fillSuggestion(this)">Write a Python hello world</button>
-        <button class="suggestion-chip" onclick="fillSuggestion(this)">Difference between RAM and ROM?</button>
-        <button class="suggestion-chip" onclick="fillSuggestion(this)">5 tips for better sleep</button>
+      <div class="perks-row" id="perksRow" style="display:none">
+        <div class="perk-item">⚡ Unlimited AI messages</div>
+        <div class="perk-item">🔓 No login needed</div>
+        <div class="perk-item">🧠 Simple &amp; fast</div>
+        <div class="perk-item">🎨 Image generation</div>
+        <div class="perk-item">💻 Coding help</div>
       </div>
+      <p id="welcomeSubtitle">Free AI chat, image generation, coding help — no sign-up needed.</p>
+      <div class="chips" id="chipsContainer"></div>
     `;
+    setTimeout(() => { renderSuggestions(); showFirstVisitPerks(); }, 0);
     messagesEl.appendChild(welcome);
     return;
   }
@@ -949,7 +952,7 @@ async function regenerateImage(prompt, chatId, cardEl) {
   if (!prompt || !cardEl) return;
 
   const newSeed = Date.now();
-  const newUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&seed=${newSeed}`;
+  const newUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=768&height=768&nologo=true&enhance=true&seed=${newSeed}`;
 
   // Disable regen button and show loading state
   const regenBtn = cardEl.querySelector(".img-action-btn.regen");
@@ -1026,7 +1029,7 @@ async function generateImage(prompt, chatId) {
   showThinking("image");
 
   const seed    = Date.now();
-  const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&seed=${seed}`;
+  const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=768&height=768&nologo=true&enhance=true&seed=${seed}`;
 
   const row = document.createElement("div");
   row.className = "message-row bou-row";
@@ -1063,6 +1066,7 @@ async function generateImage(prompt, chatId) {
 
   // Load image
   const img = new Image();
+  img.crossOrigin = "anonymous";
   img.src = imageUrl;
   img.alt = prompt;
 
@@ -1296,7 +1300,49 @@ function applyTheme(theme) {
 
 function toggleTheme() {
   const current = document.documentElement.getAttribute("data-theme") || "dark";
-  applyTheme(current === "dark" ? "light" : "dark");
+  if (current === "dark") {
+    // Troll: warn before switching to light
+    showSyncDialog(
+      "⚠️ Are you sure?",
+      "Are you sure you want to switch to light mode?\n\nThis mode may not be suitable for Discord users. Mostly Discord mods. Switch at your own risk. 🌞",
+      "Yes, blind me",
+      "Save your eyes 🧿",
+      () => { applyTheme("light"); showToast("My eyes! 😭"); },
+      () => { showToast("Wise choice. Stay in the dark. 🌙"); }
+    );
+  } else {
+    // Troll: switching BACK to dark requires 3 clicks
+    if (!window._darkClickCount) window._darkClickCount = 0;
+    window._darkClickCount++;
+    if (window._darkClickCount === 1) {
+      showSyncDialog(
+        "Didn't I warn you? 😏",
+        "Do you want to switch back to our beloved dark mode? 🌙",
+        "Yes please!",
+        "No...",
+        () => {
+          showSyncDialog(
+            "Are you REALLY sure? 🤨",
+            "Like really really sure you want dark mode back?",
+            "YES! Dark mode!",
+            "Maybe not...",
+            () => {
+              showSyncDialog(
+                "Last chance 🌑",
+                "Okay okay, dark mode coming right up. Just one more click.",
+                "DARK MODE NOW! 🌙",
+                "Fine, keep the light",
+                () => { applyTheme("dark"); window._darkClickCount = 0; showToast("Welcome back to the dark side. 🌙"); },
+                () => { showToast("I knew it. You love the light. ☀️"); }
+              );
+            },
+            () => { showToast("That's what I thought. ☀️"); }
+          );
+        },
+        () => { showToast("Enjoy the light! ☀️"); }
+      );
+    }
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -1409,6 +1455,8 @@ function renderUserSection() {
     uploadBtn.classList.toggle("gated", !isLoggedIn());
     uploadBtn.title = isLoggedIn() ? "Upload image" : "Sign in to upload images";
   }
+  // Add mobile theme toggle
+  addMobileThemeToggle();
 }
 
 async function handleSignOut() {
@@ -1616,42 +1664,104 @@ window.addEventListener("load", async () => {
   // Load session
   await getSession();
 
-  // Listen for auth changes (e.g. after Google redirect)
+  // Track if this is a brand new sign-up vs returning login
+  let _handledSignin = false;
+
   onAuthChange(async (event, session) => {
-    if (event === "SIGNED_IN" && session) {
-      // Load cloud chats
-      showToast("Signed in! Loading your chats…");
-      const cloudChats = await loadChatsFromCloud();
-      if (cloudChats && cloudChats.length > 0) {
-        chats = cloudChats;
-        activeChatId = chats[0].id;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(chats));
-        localStorage.setItem(ACTIVE_KEY, activeChatId);
-      }
-      // Load cloud memory
-      const cloudMem = await loadMemoryFromCloud();
-      if (cloudMem) {
-        localStorage.setItem("bou_memory", JSON.stringify(cloudMem));
-      }
-      renderChatHistory();
-      renderMessages();
-      renderUserSection();
+    if ((event === "SIGNED_IN" || event === "TOKEN_REFRESHED") && session && !_handledSignin) {
+      _handledSignin = true;
       closeAuthModal();
+
+      const cloudChats = await loadChatsFromCloud();
+      const hasCloud   = cloudChats && cloudChats.length > 0;
+      // Check if this user has any real local chats (non-empty)
+      const localRealChats = chats.filter(c => c.messages.length > 0);
+      const hasLocal = localRealChats.length > 0;
+
+      if (hasCloud) {
+        // Returning user on a new device — warn them
+        showSyncDialog(
+          "Welcome back!",
+          "Your chats from the database will be loaded. Your current device chats will be replaced.",
+          "Continue",
+          "Sign out",
+          async () => {
+            chats = cloudChats;
+            activeChatId = chats[0]?.id || null;
+            // Add fresh chat at top
+            const fresh = { id: generateId(), name: "New Chat", messages: [] };
+            chats.unshift(fresh);
+            activeChatId = fresh.id;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(chats));
+            localStorage.setItem(ACTIVE_KEY, activeChatId);
+            // Load cloud memory
+            const mem = await loadMemoryFromCloud();
+            if (mem) localStorage.setItem("bou_memory", JSON.stringify(mem));
+            renderChatHistory(); renderMessages(); renderUserSection();
+            showToast("Chats loaded from your account!");
+          },
+          async () => { await signOut(); renderUserSection(); }
+        );
+      } else if (hasLocal) {
+        // New user with existing local chats — ask to sync or delete
+        showSyncDialog(
+          "Sync your chats?",
+          "Do you want to save your existing chats to your account? Saying No will permanently delete your current chats.",
+          "Yes, sync my chats",
+          "No, delete them",
+          async () => {
+            // Sync local chats + memory to cloud
+            await saveChatsToCloud(chats);
+            const mem = loadMemory();
+            await saveMemoryToCloud(mem);
+            // Add fresh chat at top
+            const fresh = { id: generateId(), name: "New Chat", messages: [] };
+            chats.unshift(fresh);
+            activeChatId = fresh.id;
+            saveChats();
+            renderChatHistory(); renderMessages(); renderUserSection();
+            showToast("Chats synced to your account!");
+          },
+          async () => {
+            // Delete local chats
+            chats = [];
+            const fresh = { id: generateId(), name: "New Chat", messages: [] };
+            chats.push(fresh);
+            activeChatId = fresh.id;
+            saveChats();
+            renderChatHistory(); renderMessages(); renderUserSection();
+            showToast("Previous chats deleted.");
+          }
+        );
+      } else {
+        // New user, no local chats — just set up fresh
+        const fresh = { id: generateId(), name: "New Chat", messages: [] };
+        chats.unshift(fresh);
+        activeChatId = fresh.id;
+        saveChats();
+        renderChatHistory(); renderMessages(); renderUserSection();
+        showToast("Welcome to BouAI!");
+      }
     } else if (event === "SIGNED_OUT") {
-      renderUserSection();
+      _handledSignin = false;
+      loadChats();
+      const fresh = { id: generateId(), name: "New Chat", messages: [] };
+      chats.unshift(fresh);
+      activeChatId = fresh.id;
+      saveChats();
+      renderChatHistory(); renderMessages(); renderUserSection();
     }
   });
 
-  // Load chats
+  // Load chats — always start on a fresh new chat
   loadChats();
-  if (chats.length === 0) {
-    const fresh = { id: generateId(), name: "New Chat", messages: [] };
-    chats.push(fresh);
-    activeChatId = fresh.id;
-    saveChats();
-  } else {
-    if (!chats.find(c => c.id === activeChatId)) activeChatId = chats[0].id;
-  }
+
+  // Always open with a brand new empty chat
+  const freshStart = { id: generateId(), name: "New Chat", messages: [] };
+  chats.unshift(freshStart);
+  if (chats.length > getMaxChats()) chats = chats.slice(0, getMaxChats());
+  activeChatId = freshStart.id;
+  saveChats();
 
   renderChatHistory();
   renderMessages();
@@ -1659,4 +1769,151 @@ window.addEventListener("load", async () => {
 
   inputEl.addEventListener("input", updateSendBtn);
   inputEl.focus();
+
+  // Render rotating suggestions on the static welcome state (index.html)
+  renderSuggestions();
+  showFirstVisitPerks();
 });
+
+// ═══════════════════════════════════════════
+// SYNC DIALOG (reusable modal)
+// ═══════════════════════════════════════════
+function showSyncDialog(title, message, yesLabel, noLabel, onYes, onNo) {
+  // Remove existing
+  document.getElementById("syncDialog")?.remove();
+
+  const overlay = document.createElement("div");
+  overlay.id = "syncDialog";
+  overlay.style.cssText = `
+    position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:500;
+    display:flex;align-items:center;justify-content:center;
+    backdrop-filter:blur(4px);animation:fadeIn 0.2s ease;
+    padding:16px;
+  `;
+
+  const modal = document.createElement("div");
+  modal.style.cssText = `
+    background:var(--sidebar-bg,#0d0d0f);border:1px solid var(--border-md);
+    border-radius:16px;padding:28px 26px 22px;max-width:380px;width:100%;
+    box-shadow:0 24px 64px rgba(0,0,0,0.6);animation:slideUp 0.25s ease;
+  `;
+
+  // Escape newlines in message for display
+  const msgLines = message.split("\\n").map(l => `<p style="margin:0 0 6px;font-size:13px;color:var(--text-2,#94a3b8);line-height:1.6">${escHtml(l)}</p>`).join("");
+
+  modal.innerHTML = `
+    <h3 style="font-size:15px;font-weight:600;color:var(--text,#fafafa);margin:0 0 12px">${escHtml(title)}</h3>
+    <div style="margin-bottom:18px">${msgLines}</div>
+    <div style="display:flex;gap:8px;flex-direction:column">
+      <button id="syncYes" style="padding:10px;background:var(--blue,#10b981);color:#fff;border:none;border-radius:9px;font-family:var(--font);font-size:13.5px;font-weight:500;cursor:pointer;transition:background 0.15s">${escHtml(yesLabel)}</button>
+      <button id="syncNo"  style="padding:10px;background:transparent;color:var(--text-2,#94a3b8);border:1px solid var(--border-md);border-radius:9px;font-family:var(--font);font-size:13.5px;cursor:pointer;transition:background 0.15s">${escHtml(noLabel)}</button>
+    </div>`;
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  document.getElementById("syncYes").onclick = () => { overlay.remove(); onYes && onYes(); };
+  document.getElementById("syncNo").onclick  = () => { overlay.remove(); onNo  && onNo();  };
+}
+
+// ═══════════════════════════════════════════
+// MOBILE THEME TOGGLE
+// ═══════════════════════════════════════════
+function addMobileThemeToggle() {
+  // Add theme toggle button to mobile drawer footer if not already there
+  const footer = document.querySelector(".drawer-footer");
+  if (!footer || document.getElementById("mobileThemeToggle")) return;
+  const btn = document.createElement("button");
+  btn.id = "mobileThemeToggle";
+  btn.onclick = toggleTheme;
+  btn.style.cssText = `
+    display:flex;align-items:center;gap:8px;width:100%;
+    padding:8px 10px;background:none;border:1px solid var(--border);
+    border-radius:8px;color:var(--text-2);font-family:var(--font);
+    font-size:13px;cursor:pointer;margin-bottom:8px;transition:background 0.15s;
+  `;
+  btn.innerHTML = `
+    <svg class="icon-sun-m" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="15" height="15"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>
+    <svg class="icon-moon-m" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="15" height="15" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    <span id="mobileThemeLabel">Light mode</span>`;
+  footer.prepend(btn);
+  updateMobileThemeBtn();
+}
+
+function updateMobileThemeBtn() {
+  const theme = document.documentElement.getAttribute("data-theme") || "dark";
+  const sun  = document.querySelector(".icon-sun-m");
+  const moon = document.querySelector(".icon-moon-m");
+  const lbl  = document.getElementById("mobileThemeLabel");
+  if (sun)  sun.style.display  = theme === "dark"  ? "block" : "none";
+  if (moon) moon.style.display = theme === "light" ? "block" : "none";
+  if (lbl)  lbl.textContent    = theme === "dark"  ? "Light mode" : "Dark mode";
+}
+
+// Patch applyTheme to also update mobile button
+const _origApplyTheme = applyTheme;
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  localStorage.setItem(THEME_KEY, theme);
+  const sunIcon  = document.querySelector(".icon-sun");
+  const moonIcon = document.querySelector(".icon-moon");
+  if (sunIcon  && moonIcon) {
+    sunIcon.style.display  = theme === "dark"  ? "block" : "none";
+    moonIcon.style.display = theme === "light" ? "block" : "none";
+  }
+  updateMobileThemeBtn();
+}
+
+// ═══════════════════════════════════════════
+// ROTATING SUGGESTIONS + FIRST VISIT PERKS
+// ═══════════════════════════════════════════
+const ALL_SUGGESTIONS = [
+  "How does machine learning work?",
+  "Write a Python hello world",
+  "Generate an image of a sunset over mountains",
+  "5 tips for better sleep",
+  "Explain quantum computing simply",
+  "Generate an image of a futuristic city",
+  "What is the difference between RAM and ROM?",
+  "Write a JavaScript function to sort an array",
+  "Generate an image of a cozy rainy cafe",
+  "How does the internet actually work?",
+  "Write a simple HTML webpage",
+  "Give me a fun fact I probably don't know",
+  "Generate an image of a dragon in a forest",
+  "What is recursion in programming?",
+  "Help me write a professional email",
+  "Generate an image of a cute robot",
+  "Explain blockchain in simple terms",
+  "Write a CSS animation for a bouncing ball",
+  "What are 3 good habits to build?",
+  "Generate an image of space with galaxies",
+];
+
+function renderSuggestions() {
+  const container = document.getElementById("chipsContainer");
+  if (!container) return;
+
+  // Pick 4 random suggestions (shuffle and take first 4)
+  const shuffled = [...ALL_SUGGESTIONS].sort(() => Math.random() - 0.5);
+  const picked = shuffled.slice(0, 4);
+
+  container.innerHTML = picked.map(s =>
+    `<button class="chip" onclick="fillSuggestion(this)">${escHtml(s)}</button>`
+  ).join("");
+}
+
+function showFirstVisitPerks() {
+  const SEEN_KEY = "bou_seen_perks";
+  if (localStorage.getItem(SEEN_KEY)) return;
+  localStorage.setItem(SEEN_KEY, "1");
+  const perksRow = document.getElementById("perksRow");
+  const subtitle = document.getElementById("welcomeSubtitle");
+  if (perksRow) perksRow.style.display = "flex";
+  if (subtitle) subtitle.style.display = "none";
+  // After 5s, hide perks and show subtitle
+  setTimeout(() => {
+    if (perksRow) { perksRow.style.opacity = "0"; perksRow.style.transition = "opacity 0.5s"; setTimeout(() => { perksRow.style.display = "none"; }, 500); }
+    if (subtitle) { subtitle.style.display = ""; subtitle.style.opacity = "0"; subtitle.style.transition = "opacity 0.5s"; setTimeout(() => { subtitle.style.opacity = "1"; }, 50); }
+  }, 5000);
+}
