@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <!-- Supabase keys (read by auth.js) -->
-  <meta name="sb-url"  content="https://ywmiakachpicmoqktjrd.supabase.co" />
-  <meta name="sb-anon" content="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bWlha2FjaHBpY21vcWt0anJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NjY1MDUsImV4cCI6MjA5MTQ0MjUwNX0.0HK5ttCXoTs1RdyeJqs8jk641WpOPgKoklW_M4bROdU" />
+  <meta name="sb-url"  content="SUPABASE_URL_PLACEHOLDER" />
+  <meta name="sb-anon" content="SUPABASE_ANON_PLACEHOLDER" />
 
   <!-- Primary SEO -->
   <title>BouAI — Free AI Chatbot | Chat, Generate Images & Code</title>
@@ -226,14 +226,17 @@
           </div>
           <div class="welcome-state" id="welcomeState">
             <div class="welcome-avatar"><img src="/images/bou-avatar.png" alt="BouAI" /></div>
-            <h2>How can I help you?</h2>
-            <p>Free AI chat, image generation, coding help — no sign-up needed.</p>
-            <div class="chips">
-              <button class="chip" onclick="fillSuggestion(this)">How does machine learning work?</button>
-              <button class="chip" onclick="fillSuggestion(this)">Write a Python hello world</button>
-              <button class="chip" onclick="fillSuggestion(this)">Generate an image of a forest at night</button>
-              <button class="chip" onclick="fillSuggestion(this)">5 tips for better sleep</button>
+            <h2>How can I help you today?</h2>
+            <!-- First-visit perks (shown only once) -->
+            <div class="perks-row" id="perksRow" style="display:none">
+              <div class="perk-item">⚡ Unlimited AI messages</div>
+              <div class="perk-item">🔓 No login needed</div>
+              <div class="perk-item">🧠 Simple &amp; fast</div>
+              <div class="perk-item">🎨 AI image generation</div>
+              <div class="perk-item">💻 Coding help</div>
             </div>
+            <p id="welcomeSubtitle">Free AI chat, image generation, coding help — no sign-up needed.</p>
+            <div class="chips" id="chipsContainer"></div>
           </div>
         </div>
         <div class="input-wrap">
