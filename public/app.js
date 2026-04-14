@@ -17,7 +17,6 @@ let activeChatId = null;
 let isLoading    = false;
 let stopRequested = false;
 let currentController = null; // AbortController for fetch
-let pendingFile = null;       // { fileContext, fileName, fileType, previewUrl }
 
 // ===========================
 // DOM REFS
@@ -106,7 +105,14 @@ function generateId() {
 }
 
 function newChat() {
-  // If current chat is empty (no messages), just focus input
+  // If landing page is showing with no active chat, just focus input
+  if (!activeChatId) {
+    hideLandingPage();
+    showPage("chat"); clearPageActive();
+    inputEl.focus();
+    return;
+  }
+  // If current chat is empty, just focus
   const current = chats.find(c => c.id === activeChatId);
   if (current && current.messages.length === 0) {
     showPage("chat"); clearPageActive();
@@ -134,7 +140,8 @@ function newChat() {
 }
 
 function switchChat(id) {
-  if (id === activeChatId) return;
+  if (id === activeChatId) { closeMobileMenu(); return; }
+  hideLandingPage();
   activeChatId = id;
   saveChats();
   renderChatHistory();
@@ -619,15 +626,21 @@ async function sendMessage() {
   const text = inputEl.value.trim();
   if (!text || isLoading) return;
 
-  // Ensure there's an active chat
-  if (!activeChatId) newChat();
+  // If no active chat, create one now (user sent first message)
+  if (!activeChatId) {
+    hideLandingPage();
+    const chat = { id: generateId(), name: "New Chat", messages: [] };
+    chats.unshift(chat);
+    if (chats.length > getMaxChats()) chats = chats.slice(0, getMaxChats());
+    activeChatId = chat.id;
+    saveChats();
+    renderChatHistory();
+  }
   // Dismiss welcome
   document.getElementById("welcomeState")?.remove();
 
   inputEl.value = "";
   inputEl.style.height = "auto";
-  clearPendingFile();
-
   const chat = getActiveChat();
   if (!chat) return;
 
@@ -662,7 +675,7 @@ async function sendMessage() {
     const response = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text, history, memoryContext: buildMemoryPrompt(), fileContext: pendingFile?.fileContext || null }),
+      body: JSON.stringify({ message: text, history, memoryContext: buildMemoryPrompt() }),
       signal: currentController.signal
     });
 
@@ -819,85 +832,6 @@ function copyCode(btn) {
 // ===========================
 // FILE UPLOAD
 // ===========================
-async function handleFileSelect(input) {
-  const file = input.files[0];
-  if (!file) return;
-  input.value = "";
-
-  const MAX_SIZE = 4 * 1024 * 1024; // 4MB (Gemini limit)
-  if (file.size > MAX_SIZE) {
-    alert("Image is too large. Please upload an image under 4MB.");
-    return;
-  }
-
-  const isImage = file.type.startsWith("image/");
-  if (!isImage) {
-    alert("Only image files are supported (JPG, PNG, WEBP, GIF).");
-    return;
-  }
-
-  showFilePreview(file.name, "image", true);
-
-  try {
-    const base64 = await toBase64(file);
-
-    const res = await fetch("/api/vision", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ base64, mimeType: file.type, fileName: file.name })
-    });
-    const data = await res.json();
-
-    if (data.error) {
-      clearPendingFile();
-      alert("Could not read image: " + data.error);
-      return;
-    }
-
-    pendingFile = {
-      fileContext: data.fileContext,
-      fileName: file.name,
-      fileType: "image"
-    };
-    showFilePreview(file.name, "image", false);
-    updateSendBtn();
-  } catch (err) {
-    clearPendingFile();
-    alert("Error reading image. Please try again.");
-  }
-}
-
-function toBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result.split(",")[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-function showFilePreview(fileName, type, loading = false) {
-  const bar = document.getElementById("filePreviewBar");
-  const info = document.getElementById("filePreviewInfo");
-  if (!bar || !info) return;
-
-  const icons = {
-    image: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="14" height="14"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`,
-    pdf:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="14" height="14"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`,
-    file:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="14" height="14"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`
-  };
-
-  info.innerHTML = `${icons[type] || icons.file} ${escHtml(fileName)}${loading ? " — Reading…" : " — Ready"}`;
-  bar.style.display = "block";
-}
-
-function clearPendingFile() {
-  pendingFile = null;
-  const bar = document.getElementById("filePreviewBar");
-  if (bar) bar.style.display = "none";
-  updateSendBtn();
-}
-
 // ===========================
 // IMAGE ZOOM
 // ===========================
@@ -1472,15 +1406,6 @@ async function handleSignOut() {
 // ═══════════════════════════════════════════
 // UPLOAD GATE
 // ═══════════════════════════════════════════
-function handleUploadClick() {
-  if (!isLoggedIn()) {
-    showToast("Sign in to upload images.");
-    openAuthModal();
-    return;
-  }
-  document.getElementById("fileInput").click();
-}
-
 // ═══════════════════════════════════════════
 // TOAST NOTIFICATION
 // ═══════════════════════════════════════════
@@ -1753,26 +1678,18 @@ window.addEventListener("load", async () => {
     }
   });
 
-  // Load chats — always start on a fresh new chat
+  // Load existing chats — do NOT create a new one automatically
   loadChats();
-
-  // Always open with a brand new empty chat
-  const freshStart = { id: generateId(), name: "New Chat", messages: [] };
-  chats.unshift(freshStart);
-  if (chats.length > getMaxChats()) chats = chats.slice(0, getMaxChats());
-  activeChatId = freshStart.id;
-  saveChats();
+  // Set activeChatId to null so we show the landing/welcome state
+  activeChatId = null;
 
   renderChatHistory();
-  renderMessages();
+  // Show landing page instead of a chat
+  showLandingPage();
   renderUserSection();
 
   inputEl.addEventListener("input", updateSendBtn);
   inputEl.focus();
-
-  // Render rotating suggestions on the static welcome state (index.html)
-  renderSuggestions();
-  showFirstVisitPerks();
 });
 
 // ═══════════════════════════════════════════
@@ -1916,4 +1833,129 @@ function showFirstVisitPerks() {
     if (perksRow) { perksRow.style.opacity = "0"; perksRow.style.transition = "opacity 0.5s"; setTimeout(() => { perksRow.style.display = "none"; }, 500); }
     if (subtitle) { subtitle.style.display = ""; subtitle.style.opacity = "0"; subtitle.style.transition = "opacity 0.5s"; setTimeout(() => { subtitle.style.opacity = "1"; }, 50); }
   }, 5000);
+}
+
+// ═══════════════════════════════════════════
+// LANDING PAGE
+// ═══════════════════════════════════════════
+function showLandingPage() {
+  // Hide the main chat layout, show landing
+  const chatLayout = document.querySelector(".chat-layout");
+  if (chatLayout) chatLayout.style.display = "none";
+
+  let landing = document.getElementById("landingPage");
+  if (!landing) {
+    landing = document.createElement("div");
+    landing.id = "landingPage";
+    landing.className = "landing-page";
+    landing.innerHTML = `
+      <div class="landing-inner">
+        <div class="landing-avatar">
+          <img src="/images/bou-avatar.png" alt="BouAI" />
+        </div>
+        <h1 class="landing-title">Meet <span>BouAI</span></h1>
+        <p class="landing-sub">Your free AI assistant — no sign-up required.</p>
+
+        <div class="landing-features">
+          <div class="landing-feat">
+            <div class="landing-feat-icon">💬</div>
+            <div>
+              <strong>Unlimited AI chat</strong>
+              <span>Ask anything, get instant answers</span>
+            </div>
+          </div>
+          <div class="landing-feat">
+            <div class="landing-feat-icon">🎨</div>
+            <div>
+              <strong>Image generation</strong>
+              <span>Just say "generate an image of…"</span>
+            </div>
+          </div>
+          <div class="landing-feat">
+            <div class="landing-feat-icon">💻</div>
+            <div>
+              <strong>Coding help</strong>
+              <span>Write, debug, and download code</span>
+            </div>
+          </div>
+          <div class="landing-feat">
+            <div class="landing-feat-icon">🧠</div>
+            <div>
+              <strong>Remembers you</strong>
+              <span>Learns your name, preferences and style</span>
+            </div>
+          </div>
+          <div class="landing-feat">
+            <div class="landing-feat-icon">☁️</div>
+            <div>
+              <strong>Sync across devices</strong>
+              <span>Sign in to keep chats everywhere</span>
+            </div>
+          </div>
+          <div class="landing-feat">
+            <div class="landing-feat-icon">🔒</div>
+            <div>
+              <strong>Privacy first</strong>
+              <span>No data sold, no tracking</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="landing-actions">
+          <button class="landing-start-btn" onclick="startNewChatFromLanding()">
+            Start chatting →
+          </button>
+          <p class="landing-or">or pick a suggestion</p>
+          <div class="chips" id="landingChips"></div>
+        </div>
+      </div>`;
+
+    const pageChat = document.getElementById("page-chat");
+    if (pageChat) pageChat.appendChild(landing);
+  }
+
+  landing.style.display = "flex";
+  showPage("chat");
+
+  // Render chips inside landing
+  const landingChips = document.getElementById("landingChips");
+  if (landingChips) {
+    const shuffled = [...ALL_SUGGESTIONS].sort(() => Math.random() - 0.5);
+    landingChips.innerHTML = shuffled.slice(0, 4).map(s =>
+      `<button class="chip" onclick="startChatWithSuggestion(${JSON.stringify(s)})">${escHtml(s)}</button>`
+    ).join("");
+  }
+
+  showFirstVisitPerks();
+}
+
+function hideLandingPage() {
+  const landing = document.getElementById("landingPage");
+  if (landing) landing.style.display = "none";
+  const chatLayout = document.querySelector(".chat-layout");
+  if (chatLayout) chatLayout.style.display = "";
+}
+
+function startNewChatFromLanding() {
+  hideLandingPage();
+  const chat = { id: generateId(), name: "New Chat", messages: [] };
+  chats.unshift(chat);
+  if (chats.length > getMaxChats()) chats = chats.slice(0, getMaxChats());
+  activeChatId = chat.id;
+  saveChats();
+  renderChatHistory();
+  renderMessages();
+  showPage("chat");
+  inputEl.focus();
+}
+
+function startChatWithSuggestion(text) {
+  startNewChatFromLanding();
+  // Small delay to let the DOM settle then fill input and send
+  setTimeout(() => {
+    inputEl.value = text;
+    autoResize(inputEl);
+    updateSendBtn();
+    sendMessage();
+  }, 100);
 }
