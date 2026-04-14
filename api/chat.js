@@ -21,20 +21,17 @@ IMAGE DETECTION RULES:
 - Never wrap the JSON in markdown code blocks. Output it as raw text only.
 
 CODING RULES:
-- When asked to write, create, or build code, respond with ONLY this JSON on a single line:
+- When asked to write, create, build, or generate code, respond with ONLY this JSON on a single line:
   {"action":"coding","language":"<language>","filename":"<appropriate filename with extension>","task":"<brief task description>","code":"<the complete code>"}
-- The language field must be the exact programming language name (python, javascript, html, css, java, cpp, etc.)
+- The language field must be the exact programming language name (python, javascript, html, css, java, cpp, typescript, bash, sql, etc.)
 - The filename field must be a sensible filename e.g. hello.py, index.html, app.js, script.sh
-- The code field must contain complete working code — no truncation, no placeholders
+- The code field must contain COMPLETE, WORKING code — no truncation, no placeholders, no comments saying "add your code here"
+- Write clean, well-commented, production-quality code
+- Include proper error handling where appropriate
 - Never wrap the JSON in markdown. Output it as raw text only.
 - Only use this for actual code writing tasks, not explanations about code.
-- If the code would be extremely long (over 200 lines), respond with:
-  {"action":"coding_too_long","message":"<explain what you can help with instead, e.g. check for errors, explain logic, write a smaller section>"}
-
-FILE CONTEXT RULES:
-- If the user has uploaded a file, context will be prepended in [FILE CONTEXT] tags
-- Use that context to answer the user's question accurately
-- Reference the file content naturally in your response
+- If the code would be extremely long (over 300 lines), respond with:
+  {"action":"coding_too_long","message":"<explain what you can help with instead, e.g. check for errors, explain logic, write a specific function>"}
 
 SAFETY RULES — highest priority:
 - If asked about anything illegal, harmful, violent, sexual, or unethical, respond with:
@@ -87,70 +84,6 @@ async function callGroq(apiKey, messages) {
   return { status: res.status, data };
 }
 
-async function callGemini(messages) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return null;
-  const systemMsg = messages.find(m => m.role === "system");
-  const turns = messages.filter(m => m.role !== "system");
-  const contents = turns.map(m => ({
-    role: m.role === "assistant" ? "model" : "user",
-    parts: [{ text: m.content }]
-  }));
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: systemMsg ? { parts: [{ text: systemMsg.content }] } : undefined,
-        contents,
-        generationConfig: { temperature: 0.7, maxOutputTokens: 2048 }
-      })
-    }
-  );
-  const data = await res.json();
-  if (!res.ok) return null;
-  return data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
-}
-
-// Detect if the user is asking for code to be written
-function isCodingRequest(msg) {
-  return /(write|create|build|make|code|implement|generate|develop|script|program).{0,40}(code|function|script|program|class|app|application|component|module|api|server|html|css|javascript|python|java|c\+\+|sql|bash|shell)/i.test(msg)
-    || /(code|script|program|function|implement|build me)/i.test(msg);
-}
-
-// Call Claude for coding tasks
-async function callClaude(messages) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
-
-  // Convert messages for Claude API
-  const systemMsg = messages.find(m => m.role === "system");
-  const turns = messages.filter(m => m.role !== "system");
-
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01"
-    },
-    body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 4096,
-      system: systemMsg ? systemMsg.content : undefined,
-      messages: turns.map(m => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }))
-    })
-  });
-
-  const data = await res.json();
-  if (!res.ok) {
-    console.error("[Bou] Claude error:", data?.error?.message);
-    return null;
-  }
-  return data?.content?.[0]?.text || null;
-}
-
 function parseActionFromReply(reply) {
   const trimmed = reply.trim();
   // Try to find JSON action in the response
@@ -166,7 +99,7 @@ function parseActionFromReply(reply) {
 module.exports = async (req, res) => {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { message, history, memoryContext, fileContext } = req.body;
+  const { message, history, memoryContext } = req.body;
   if (!message || typeof message !== "string") return res.status(400).json({ error: "Message is required." });
 
   if (isBadRequest(message)) {
@@ -182,11 +115,7 @@ module.exports = async (req, res) => {
   const memCtx = (typeof memoryContext === "string" && memoryContext.length < 2000) ? memoryContext : "";
   const fullSystemPrompt = SYSTEM_PROMPT + memCtx;
 
-  // Prepend file context to user message if present
-  let finalMessage = message;
-  if (fileContext && typeof fileContext === "string" && fileContext.length > 0) {
-    finalMessage = `[FILE CONTEXT]\n${fileContext.slice(0, 8000)}\n[/FILE CONTEXT]\n\n${message}`;
-  }
+  const finalMessage = message;
 
   const messages = [{ role: "system", content: fullSystemPrompt }];
   if (Array.isArray(history)) {
@@ -196,22 +125,7 @@ module.exports = async (req, res) => {
   }
   messages.push({ role: "user", content: finalMessage });
 
-  // Route coding requests to Claude if key is available
-  if (isCodingRequest(message)) {
-    console.log("[Bou] Coding request detected — trying Claude first...");
-    try {
-      const claudeReply = await callClaude(messages);
-      if (claudeReply) {
-        const action = parseActionFromReply(claudeReply);
-        if (action) return res.status(200).json(action);
-        return res.status(200).json({ reply: claudeReply, via: "claude" });
-      }
-    } catch (err) {
-      console.warn("[Bou] Claude failed, falling back to Groq:", err.message);
-    }
-  }
-
-  // Try Groq keys (all non-coding requests, or if Claude failed)
+  // Try Groq keys
   for (let i = 0; i < groqKeys.length; i++) {
     try {
       const { status, data } = await callGroq(groqKeys[i], messages);
@@ -237,19 +151,6 @@ module.exports = async (req, res) => {
       console.error(`[Bou] Groq key ${i + 1} error: ${err.message}`);
       continue;
     }
-  }
-
-  // Gemini fallback
-  console.warn("[Bou] All Groq keys exhausted, trying Gemini...");
-  try {
-    const geminiReply = await callGemini(messages);
-    if (geminiReply) {
-      const action = parseActionFromReply(geminiReply);
-      if (action) return res.status(200).json(action);
-      return res.status(200).json({ reply: geminiReply, via: "gemini" });
-    }
-  } catch (err) {
-    console.error("[Bou] Gemini fallback failed:", err.message);
   }
 
   return res.status(429).json({
